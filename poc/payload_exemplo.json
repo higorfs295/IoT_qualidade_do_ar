@@ -1,0 +1,10 @@
+{
+  "dispositivo_id": "esp32_sala_01",
+  "timestamp": "2026-07-27T14:20:00Z",
+  "co2_ppm": 450,
+  "tvoc_ppb": 100,
+  "pm25_ugm3": 15,
+  "pm10_ugm3": 20,
+  "temperatura_c": 24.5,
+  "umidade_perc": 50
+}
