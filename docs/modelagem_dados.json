@@ -1,4 +1,122 @@
 {
-  "projeto": "Monitoramento de Qualidade do Ar",
-  "descricao": "Estrutura do payload e armazenamento"
+  "documento": "Modelo de dados e politica de retencao - Monitoramento de Qualidade do Ar",
+  "versao": "1.0",
+  "contexto": {
+    "projeto_origem": "Atividade-2-IoT",
+    "frequencia_padrao_segundos": 60,
+    "protocolo": "MQTT sobre TLS",
+    "qos_recomendado": 1,
+    "topico": "qualidade-ar/{site_id}/{device_id}/telemetria"
+  },
+  "payload_exemplo": {
+    "schema_version": "1.0",
+    "message_id": "01JQ7PK0P3R7V5BT7P0Q9YQ8A1",
+    "device_id": "esp32-sala-01",
+    "site_id": "campus-ufg-bloco-inf",
+    "sent_at": "2026-07-27T14:20:00Z",
+    "sequence": 428,
+    "measurements": {
+      "co2_ppm": 450,
+      "tvoc_ppb": 100,
+      "pm1_ugm3": 8.4,
+      "pm25_ugm3": 15.0,
+      "pm10_ugm3": 20.0,
+      "temperature_c": 24.5,
+      "humidity_pct": 50.0
+    },
+    "quality": {
+      "gas_status": "SAFE",
+      "sensor_status": "OK"
+    },
+    "metadata": {
+      "firmware_version": "1.0.0",
+      "rssi_dbm": -62
+    }
+  },
+  "contrato": {
+    "obrigatorios": [
+      "schema_version",
+      "message_id",
+      "device_id",
+      "site_id",
+      "sent_at",
+      "sequence",
+      "measurements",
+      "quality.sensor_status"
+    ],
+    "regras": [
+      "sent_at usa UTC no formato RFC 3339/ISO 8601.",
+      "message_id deve ser unico por leitura e permite processamento idempotente.",
+      "sequence cresce a cada leitura e ajuda a detectar lacunas apos reconexao.",
+      "Valores numericos usam ponto decimal e nunca texto com unidade.",
+      "Ausencia temporaria de uma medicao deve ser representada por null; o sensor_status deve indicar DEGRADED ou ERROR.",
+      "Credenciais, chaves, endereco MAC e dados pessoais nao podem ser enviados no payload."
+    ],
+    "unidades": {
+      "co2_ppm": "ppm",
+      "tvoc_ppb": "ppb",
+      "pm1_ugm3": "microgramas por metro cubico",
+      "pm25_ugm3": "microgramas por metro cubico",
+      "pm10_ugm3": "microgramas por metro cubico",
+      "temperature_c": "graus Celsius",
+      "humidity_pct": "percentual de umidade relativa",
+      "rssi_dbm": "dBm"
+    },
+    "valores_controlados": {
+      "gas_status": ["SAFE", "UNSAFE", "UNKNOWN"],
+      "sensor_status": ["OK", "DEGRADED", "ERROR"]
+    }
+  },
+  "armazenamento": {
+    "chave_particao_s3": "raw/year=YYYY/month=MM/day=DD/hour=HH/site_id={site_id}/",
+    "formato_longo_prazo": "Parquet comprimido por hora e por site_id",
+    "dynamodb": {
+      "tabela": "air-quality-state",
+      "pk": "DEVICE#{device_id}",
+      "sk": "LATEST ou HOUR#{sent_at truncado para hora}",
+      "uso": "estado mais recente e agregados horarios para o dashboard; leituras brutas ficam no S3"
+    }
+  },
+  "politica_retencao": {
+    "dynamodb": [
+      {
+        "classe": "estado atual por dispositivo",
+        "retencao": "sem TTL; sobrescrito a cada nova leitura",
+        "justificativa": "dashboard precisa consultar a ultima leitura de cada sensor"
+      },
+      {
+        "classe": "agregados horarios",
+        "retencao": "90 dias via atributo expires_at (TTL)",
+        "justificativa": "suporta consultas recentes sem manter toda a serie bruta em banco transacional"
+      }
+    ],
+    "s3": [
+      {
+        "classe": "telemetria bruta JSON",
+        "retencao": "30 dias em S3 Standard",
+        "acao": "transicionar para Parquet comprimido; expirar o JSON bruto apos conversao validada"
+      },
+      {
+        "classe": "telemetria historica Parquet",
+        "retencao": "31 a 365 dias em S3 Intelligent-Tiering; 1 a 5 anos em Glacier Flexible Retrieval; expirar ao final de 5 anos",
+        "justificativa": "mantem historico para analises com custo menor"
+      },
+      {
+        "classe": "mensagens invalidas/quarentena",
+        "retencao": "30 dias e expiracao automatica",
+        "justificativa": "tempo suficiente para diagnostico sem armazenar lixo indefinidamente"
+      }
+    ],
+    "operacional": [
+      {
+        "classe": "fila de mensagens nao processadas (DLQ)",
+        "retencao": "14 dias"
+      },
+      {
+        "classe": "logs de aplicacao CloudWatch",
+        "retencao": "30 dias em desenvolvimento e 90 dias em producao"
+      }
+    ],
+    "revisao": "Revisar semestralmente ou quando houver requisito legal/institucional diferente."
+  }
 }
