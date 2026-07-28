@@ -1,0 +1,9 @@
+# Dependencias da central de sensores virtual (HIL).
+# Instale com: pip install -r requirements.txt
+
+# Comunicacao com o ESP32 pela porta serial (apenas no modo --porta).
+# O modo --dry-run e o --self-test NAO precisam dela.
+pyserial>=3.5
+
+# Observacao: o gerador coerente de leituras e reutilizado do pacote da PoC
+# (poc/qar_poc), importado por caminho relativo — nao precisa instalar nada.

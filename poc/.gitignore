@@ -1,0 +1,31 @@
+# =============================================================================
+#  Artefatos da PoC que NAO devem ser versionados
+# =============================================================================
+
+# Bytecode e cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Segredos e variaveis locais (mantendo os modelos .example)
+.env
+*.env
+!.env.example
+
+# Relatorios gerados pelo gerador de carga
+relatorio*.json
+
+# Empacotamento
+build/
+dist/
+*.egg-info/
+
+# Ferramentas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

@@ -1,0 +1,39 @@
+# =============================================================================
+#  Mosquitto ACL - modelo de autorizacao (exemplo)
+#  Projeto: Monitoramento de Qualidade do Ar - Atividade 3
+# =============================================================================
+#
+#  Copie para `aclfile`, ajuste os usuarios e referencie-o em mosquitto.conf
+#  (acl_file /mosquitto/config/aclfile). Este modelo aplica o principio de
+#  menor privilegio, o mesmo que o plano de AWS descreve para as politicas
+#  IoT por device_id.
+#
+#  Padrao de topico do contrato:
+#    qualidade-ar/{site_id}/{device_id}/telemetria
+# =============================================================================
+
+# ----------------------------------------------------------------------------
+# Dispositivos: cada sensor so publica no seu proprio topico.
+# %u = nome de usuario; %c = client id. Se voce nomear o usuario MQTT igual ao
+# device_id, a linha abaixo restringe a publicacao ao topico do dispositivo.
+# ----------------------------------------------------------------------------
+pattern write qualidade-ar/+/%u/telemetria
+
+# ----------------------------------------------------------------------------
+# Servico de ingestao (consumidor/gravador): apenas leitura de toda a arvore.
+# ----------------------------------------------------------------------------
+user ingestor
+topic read qualidade-ar/#
+
+# ----------------------------------------------------------------------------
+# Gerador de carga da PoC: publica em nome de milhares de dispositivos.
+# Restrito a arvore do projeto. Use SOMENTE em ambiente de teste.
+# ----------------------------------------------------------------------------
+user loadgen
+topic write qualidade-ar/#
+
+# ----------------------------------------------------------------------------
+# Operador/observabilidade: leitura das metricas internas do broker.
+# ----------------------------------------------------------------------------
+user operador
+topic read $SYS/#

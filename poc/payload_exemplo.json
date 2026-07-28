@@ -1,10 +1,26 @@
 {
-  "dispositivo_id": "esp32_sala_01",
-  "timestamp": "2026-07-27T14:20:00Z",
-  "co2_ppm": 450,
-  "tvoc_ppb": 100,
-  "pm25_ugm3": 15,
-  "pm10_ugm3": 20,
-  "temperatura_c": 24.5,
-  "umidade_perc": 50
+  "schema_version": "1.1",
+  "message_id": "01JQ7PK0P3R7V5BT7P0Q9YQ8A1",
+  "device_id": "esp32-sala-01",
+  "site_id": "campus-ufg-bloco-inf",
+  "sent_at": "2026-07-27T14:20:00.000Z",
+  "sequence": 428,
+  "measurements": {
+    "co2_ppm": 450,
+    "voc_index": 100,
+    "lpg_ppm": 4,
+    "pm1_ugm3": 8.4,
+    "pm25_ugm3": 15.0,
+    "pm10_ugm3": 20.0,
+    "temperature_c": 24.5,
+    "humidity_pct": 50.0
+  },
+  "quality": {
+    "gas_status": "SAFE",
+    "sensor_status": "OK"
+  },
+  "metadata": {
+    "firmware_version": "1.1.0",
+    "rssi_dbm": -62
+  }
 }

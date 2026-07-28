@@ -1,7 +1,168 @@
-version: '3.0'
+# =============================================================================
+#  Stack local da PoC de ingestao - Atividade 3
+#  Projeto: Monitoramento de Qualidade do Ar (UFG - Internet das Coisas)
+# =============================================================================
+#
+#  Sobe o ambiente que recebe a carga simulada por poc/ingestao_teste.py:
+#
+#    mosquitto    broker MQTT que recebe a telemetria (nucleo da PoC)
+#    thingsboard  plataforma IoT (ThingsBoard CE + PostgreSQL) - Atividade 1
+#    postgres     banco relacional dedicado ao ThingsBoard
+#
+#  Perfis (control de custo/desempenho da maquina):
+#
+#    # so o broker - suficiente para os testes de carga de milhares de sensores
+#    docker compose up -d mosquitto
+#
+#    # broker + plataforma completa (mais pesado)
+#    docker compose --profile plataforma up -d
+#
+#  Depois, do host:
+#    python ../../poc/consumidor_metricas.py --host localhost
+#    python ../../poc/ingestao_teste.py     --host localhost --sensores 5000
+#
+#  Observacao: mantido sem a chave `version:` (obsoleta no Compose v2).
+# =============================================================================
+
 services:
-  thingsboard:
-    image: thingsboard/tb-postgres
+  # ---------------------------------------------------------------------------
+  # Broker MQTT - recebe a telemetria dos sensores (o alvo do gerador de carga)
+  # ---------------------------------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: qar-mosquitto
+    restart: unless-stopped
     ports:
-      - "9090:9090"
-      - "1883:1883"
+      - "1883:1883"    # MQTT (texto) - PoC local
+      - "8883:8883"    # MQTT sobre TLS - habilitar no mosquitto.conf
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    # Eleva o limite de descritores de arquivo: cada conexao MQTT consome um.
+    # Alinhado ao ajuste que o setup_ubuntu_broker.sh faz numa VM.
+    ulimits:
+      nofile:
+        soft: 200000
+        hard: 200000
+    healthcheck:
+      # Publica uma mensagem de teste; falha se o broker nao aceitar conexao.
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -p 1883 -t healthcheck/ping -m ok -q 0 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - qar-net
+
+  # ---------------------------------------------------------------------------
+  # Sink de ingestao - consumidor que VALIDA e MEDE a telemetria (sempre ativo)
+  # ---------------------------------------------------------------------------
+  # Faz o papel local da Lambda de validacao: assina qualidade-ar/#, confere o
+  # contrato v1.0 e detecta lacunas por sequence. Deixa o ambiente "pronto":
+  # basta subir e ele ja observa a ingestao. Veja os numeros com:
+  #   docker compose logs -f sink
+  sink:
+    build:
+      context: ../../poc
+      dockerfile: Dockerfile
+    image: qar-poc:latest
+    container_name: qar-sink
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    command: ["consumidor_metricas.py", "--host", "mosquitto", "--porta", "1883",
+              "--qos", "1", "--periodo-reporte", "5"]
+    networks:
+      - qar-net
+
+  # ---------------------------------------------------------------------------
+  # Gerador de carga - executa um teste sob demanda (perfil "carga")
+  # ---------------------------------------------------------------------------
+  # Nao sobe por padrao. Dispare um teste conteinerizado com:
+  #   docker compose --profile carga run --rm gerador \
+  #     ingestao_teste.py --host mosquitto --cenario 10000 --gateways 100 --duracao 120
+  gerador:
+    build:
+      context: ../../poc
+      dockerfile: Dockerfile
+    image: qar-poc:latest
+    container_name: qar-gerador
+    profiles: ["carga"]
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    # Comando padrao (sobrescrevivel na linha de comando acima).
+    command: ["ingestao_teste.py", "--host", "mosquitto", "--porta", "1883",
+              "--sensores", "5000", "--gateways", "50", "--duracao", "120"]
+    networks:
+      - qar-net
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - banco do ThingsBoard (componente da Atividade 1)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: qar-postgres
+    restart: unless-stopped
+    profiles: ["plataforma"]
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_USER: thingsboard
+      POSTGRES_PASSWORD: ${TB_POSTGRES_PASSWORD:-thingsboard}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thingsboard -d thingsboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - qar-net
+
+  # ---------------------------------------------------------------------------
+  # ThingsBoard CE - dashboards, armazenamento e alertas (Atividade 1)
+  # ---------------------------------------------------------------------------
+  # Na primeira subida, defina INSTALL_TB=true no .env para instalar o schema
+  # no PostgreSQL; nas execucoes seguintes, volte para false.
+  #   INSTALL_TB=true LOAD_DEMO=true docker compose --profile plataforma up -d
+  thingsboard:
+    image: thingsboard/tb-node:3.8.1CE
+    container_name: qar-thingsboard
+    restart: unless-stopped
+    profiles: ["plataforma"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:9090"          # interface web (http://localhost:8080)
+      - "1884:1883"          # MQTT proprio do TB (evita conflito com o Mosquitto)
+      - "7070:7070"          # transporte de edge (opcional)
+    environment:
+      TB_SERVICE_ID: qar-tb-node
+      TB_QUEUE_TYPE: in-memory
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
+      SPRING_DATASOURCE_USERNAME: thingsboard
+      SPRING_DATASOURCE_PASSWORD: ${TB_POSTGRES_PASSWORD:-thingsboard}
+      DATABASE_TS_TYPE: sql
+      # Controlam a instalacao do schema na primeira execucao (ver .env.example).
+      INSTALL_TB: ${INSTALL_TB:-false}
+      LOAD_DEMO: ${LOAD_DEMO:-false}
+    volumes:
+      - thingsboard_data:/data
+      - thingsboard_logs:/var/log/thingsboard
+    networks:
+      - qar-net
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  postgres_data:
+  thingsboard_data:
+  thingsboard_logs:
+
+networks:
+  qar-net:
+    driver: bridge

@@ -1,0 +1,7 @@
+# Artefatos do PlatformIO / build do firmware
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+*.bin
+*.elf
