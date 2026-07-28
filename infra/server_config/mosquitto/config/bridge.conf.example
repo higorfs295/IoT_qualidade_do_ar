@@ -1,0 +1,50 @@
+# =============================================================================
+#  Mosquitto bridge - modelo de comunicacao borda -> nuvem (exemplo)
+#  Projeto: Monitoramento de Qualidade do Ar - Atividade 3
+# =============================================================================
+#
+#  Uma "bridge" faz um broker local (de BORDA) encaminhar mensagens para um
+#  broker de nivel superior (regional ou nuvem). E uma estrategia de comunicacao
+#  distribuida classica em IoT:
+#
+#    Gateways --> Mosquitto de borda --(bridge)--> Broker regional / AWS IoT Core
+#
+#  Vantagens: resiliencia (a borda continua recebendo mesmo se o enlace com a
+#  nuvem cair, e reenvia depois), reducao de latencia local e agregacao antes
+#  do uplink. E o caminho natural para conectar esta PoC ao AWS IoT Core do
+#  plano do Wilson (infra/aws/planejamento_servicos.md).
+#
+#  Para ativar: copie este bloco para dentro de um arquivo carregado pelo
+#  Mosquitto (ex.: adicione um `include_dir` ou anexe ao mosquitto.conf) e
+#  ajuste endereco, credenciais e certificados do broker de destino.
+# =============================================================================
+
+# Nome logico desta ponte.
+connection borda-para-nuvem
+
+# Endereco do broker de destino (regional ou AWS IoT Core). Use o endpoint real.
+address broker-regional.exemplo.com:8883
+
+# --- Topicos encaminhados ----------------------------------------------------
+# Direcao "out": o broker de borda ENVIA a telemetria para a nuvem.
+# Formato: topic <padrao> <direcao> <qos> [prefixo_local] [prefixo_remoto]
+topic qualidade-ar/# out 1
+
+# (Opcional) Direcao "in": receber comandos/configuracoes vindos da nuvem.
+# topic comandos/# in 1
+
+# --- Sessao e confiabilidade -------------------------------------------------
+bridge_protocol_version mqttv311
+cleansession false              # sessao persistente: nao perde o que ficou na fila
+try_private true
+notifications true              # publica o estado da ponte em $SYS
+restart_timeout 5 30            # recuo ao reconectar (min..max segundos)
+remote_clientid qar-borda-01    # identidade estavel da borda no broker remoto
+
+# --- Autenticacao e TLS (recomendado para o uplink) --------------------------
+# remote_username borda01
+# remote_password TROCAR
+# bridge_cafile   /mosquitto/config/certs/ca-nuvem.crt
+# bridge_certfile /mosquitto/config/certs/borda.crt   # mTLS (certificado da borda)
+# bridge_keyfile  /mosquitto/config/certs/borda.key
+# bridge_tls_version tlsv1.2

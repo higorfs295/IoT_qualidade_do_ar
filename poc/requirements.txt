@@ -1,0 +1,6 @@
+# Dependencias da PoC de ingestao (Atividade 3).
+# Instale com: pip install -r requirements.txt
+
+# Cliente MQTT usado pelo gerador de carga e pelo consumidor de metricas.
+# A API v2 (CallbackAPIVersion.VERSION2) exige a serie 2.x.
+paho-mqtt>=2.0,<3.0
