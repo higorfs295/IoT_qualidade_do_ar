@@ -64,9 +64,12 @@ bool FonteFisica::lerPMS7003(Leitura& l) {
 }
 
 bool FonteFisica::lerMiCS5524(Leitura& l) {
-  // Leitura analogica bruta -> ppm de GLP exige CALIBRACAO (Rs/Ro e curva).
-  // int raw = analogRead(MICS_ADC_PIN);
-  // float ppm = calibrarLpg(raw);   // implemente a curva do seu modulo
+  // O VOUT passou por um divisor ÷2 (ver hardware/pcb/README.md §2.3): recupere
+  // a tensao real multiplicando por MICS_DIVISOR. A conversao V->ppm exige
+  // CALIBRACAO (relacao Rs/Ro e a curva do datasheet do seu modulo).
+  // int raw = analogRead(MICS_ADC_PIN);                 // 0..4095
+  // float vout = (raw / 4095.0f) * ADC_VREF * MICS_DIVISOR;
+  // float ppm = calibrarLpg(vout);   // implemente a curva do seu modulo
   // l.lpg_ppm = (int)ppm; l.lpg_ok = true; return true;
   return false;  // TODO: calibrar o MiCS-5524 antes de confiar no valor
 }

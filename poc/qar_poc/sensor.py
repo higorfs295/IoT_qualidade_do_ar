@@ -43,15 +43,20 @@ class Faixa:
 #   MiCS-5524-> lpg_ppm (GLP/combustiveis)
 #   PMS7003  -> pm1, pm2.5, pm10
 #   SHT31    -> temperatura, umidade
+#
+# IMPORTANTE: estas faixas descrevem a operacao NORMAL. Grandezas que so sobem
+# em emergencia (lpg, voc) tem linha de base baixa aqui; os picos criticos sao
+# aplicados pela camada de CENARIOS do simulador HIL (simulador/central_sensores.py),
+# nunca pelo passeio aleatorio. Assim, "normal" nao dispara UNSAFE por acaso.
 FAIXAS: dict[str, Faixa] = {
-    "co2_ppm": Faixa(400, 1800, 60, casas=0),
-    "voc_index": Faixa(1, 500, 25, casas=0),
-    "lpg_ppm": Faixa(0, 1000, 30, casas=0),
-    "pm1_ugm3": Faixa(0, 60, 3, casas=1),
-    "pm25_ugm3": Faixa(0, 90, 4, casas=1),
-    "pm10_ugm3": Faixa(0, 120, 5, casas=1),
-    "temperature_c": Faixa(18, 32, 0.3, casas=1),
-    "humidity_pct": Faixa(30, 80, 1.0, casas=1),
+    "co2_ppm": Faixa(400, 1400, 50, casas=0),      # ambiente fechado tipico
+    "voc_index": Faixa(50, 180, 12, casas=0),       # ~100 = ar limpo (limiar 250)
+    "lpg_ppm": Faixa(0, 30, 3, casas=0),            # traco; vazamento e cenario
+    "pm1_ugm3": Faixa(0, 25, 2, casas=1),
+    "pm25_ugm3": Faixa(0, 30, 2.5, casas=1),        # limiar 35 (raramente cruza)
+    "pm10_ugm3": Faixa(0, 45, 3, casas=1),
+    "temperature_c": Faixa(18, 30, 0.3, casas=1),
+    "humidity_pct": Faixa(30, 75, 1.0, casas=1),
 }
 
 

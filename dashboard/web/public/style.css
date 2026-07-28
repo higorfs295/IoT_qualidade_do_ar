@@ -1,0 +1,57 @@
+/* style.css — painel de qualidade do ar (legivel, claro/escuro) */
+:root {
+  --bg: #f4f6f8; --card: #ffffff; --texto: #1a2230; --suave: #5b6673;
+  --borda: #e3e8ee; --sombra: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.05);
+  --bom: #16a34a; --bom-bg: #e8f7ee;
+  --atencao: #d97706; --atencao-bg: #fdf3e3;
+  --ruim: #dc2626; --ruim-bg: #fdeaea;
+  --neutro: #64748b; --neutro-bg: #eef1f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f141b; --card: #1a212b; --texto: #e8edf3; --suave: #9aa7b6;
+    --borda: #2a333f; --sombra: 0 1px 3px rgba(0,0,0,.3);
+    --bom-bg: #10261a; --atencao-bg: #2a1f0e; --ruim-bg: #2a1414; --neutro-bg: #1e2530;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg); color: var(--texto); }
+.topo { display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 20px; background: var(--card); border-bottom: 1px solid var(--borda); }
+.marca { font-size: 1.15rem; }
+.controles { display: flex; gap: 10px; align-items: center; }
+#seletorDispositivo { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--borda);
+  background: var(--bg); color: var(--texto); }
+.conexao { font-size: .8rem; padding: 4px 10px; border-radius: 999px; }
+.conexao.on { background: var(--bom-bg); color: var(--bom); }
+.conexao.off { background: var(--neutro-bg); color: var(--neutro); }
+main { max-width: 980px; margin: 0 auto; padding: 20px; }
+
+/* Veredito grande */
+.veredito { display: flex; align-items: center; gap: 20px; padding: 26px 28px;
+  border-radius: 18px; box-shadow: var(--sombra); margin-bottom: 22px; position: relative; }
+.veredito-emoji { font-size: 3.4rem; line-height: 1; }
+.veredito-titulo { font-size: 2rem; font-weight: 800; letter-spacing: -.5px; }
+.veredito-acao { font-size: 1.05rem; opacity: .95; margin-top: 2px; }
+.veredito-quando { position: absolute; top: 14px; right: 18px; font-size: .78rem; opacity: .7; }
+.veredito.bom { background: var(--bom-bg); color: var(--bom); }
+.veredito.atencao { background: var(--atencao-bg); color: var(--atencao); }
+.veredito.ruim { background: var(--ruim-bg); color: var(--ruim); }
+.veredito.neutro { background: var(--neutro-bg); color: var(--neutro); }
+
+/* Cartoes */
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.cartao { background: var(--card); border: 1px solid var(--borda); border-radius: 14px;
+  padding: 15px 16px; box-shadow: var(--sombra); }
+.cartao-topo { display: flex; align-items: center; gap: 8px; color: var(--suave); font-size: .9rem; }
+.cartao-valor { font-size: 1.9rem; font-weight: 800; margin: 6px 0 2px; }
+.cartao-valor .un { font-size: .9rem; font-weight: 600; color: var(--suave); margin-left: 3px; }
+.cartao-ref { font-size: .78rem; color: var(--suave); }
+.cartao-spark { margin-top: 8px; height: 30px; }
+.pino { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-left: auto; }
+.pino.bom { background: var(--bom); } .pino.atencao { background: var(--atencao); }
+.pino.ruim { background: var(--ruim); } .pino.neutro { background: var(--neutro); }
+
+.rodape { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  margin-top: 22px; color: var(--suave); font-size: .82rem; }

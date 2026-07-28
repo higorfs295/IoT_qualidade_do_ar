@@ -115,10 +115,22 @@ falhas, coerente com a Atividade 1 que já usava SCD41):
 | ADC1 — CH6 | GPIO 34 (só entrada) | MiCS-5524 VOUT |
 | USB (UART0) | GPIO 1/3 | **elo HIL com o PC** (modo simulado) + logs |
 
-> Observações de projeto: o SCD41 e o PMS7003 podem exigir **5 V** (o PMS7003
-> alimenta a ventoinha em 5 V, mas seus dados são 3.3 V-tolerantes); o MiCS-5524
-> tem **aquecedor** e precisa de estabilização térmica antes da primeira leitura
-> confiável. Detalhes de calibração ficam no firmware e no doc do PCB.
+> Observações de projeto: o PMS7003 alimenta a ventoinha em **5 V** (dados são
+> 3.3 V-tolerantes); o MiCS-5524 tem **aquecedor** e precisa de estabilização
+> térmica antes da primeira leitura confiável.
+
+**Estratégia de alimentação (resumo — detalhes em [`hardware/pcb`](hardware/pcb/README.md)):**
+
+- **5 V** para ventoinha (PMS7003) e aquecedor (MiCS-5524); **3.3 V** para os
+  três sensores I2C (Sensirion).
+- **Use fonte USB de ≥ 1 A** (não a porta de um PC, que dá 500 mA): Wi-Fi +
+  ventoinha + o pico de ~205 mA do SCD41 na medição estouram 500 mA. Some um
+  **capacitor bulk de 470–1000 µF** no 5 V para evitar brownout/reset.
+- **Redutor de tensão (obrigatório):** o VOUT analógico do MiCS-5524 pode chegar
+  perto de 5 V e queimaria o GPIO34 (máx. 3.3 V). Um **divisor ÷2 (2×10 kΩ) + RC**
+  leva o sinal a 0–2.5 V, dentro da faixa linear do ADC. O firmware multiplica
+  por `MICS_DIVISOR` para recuperar a tensão real.
+- Nenhum outro nível precisa de conversão: I2C e a UART do PMS7003 já são 3.3 V.
 
 ---
 
@@ -320,6 +332,7 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
 
 ```text
 ├── BASE_FINAL.md              ◄─ ESTE blueprint
+├── SINTESE.md                 explicação do projeto em linguagem simples (analogias)
 ├── ARQUITETURA.md             arquitetura da ingestão (já existente)
 │
 ├── firmware/                  ESP32: HAL + Strategy (sim/físico)
@@ -335,9 +348,9 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
 ├── poc/                       PoC de carga (já existente) + contrato v1.1
 │   └── qar_poc/               contrato, sensor, gateway, coordenador, sink...
 │
-├── dashboard/                 (scaffold) ingestão + web
-│   ├── backend/               Fastify: assina MQTT, valida, API + WebSocket
-│   └── web/                    Next.js: painel gerencial para leigos
+├── dashboard/                 ingestão + web (MVP funcional — Fase 2)
+│   ├── backend/src/           Node: assina MQTT, valida v1.1, REST + WebSocket
+│   └── web/public/            painel legível (verdito por cor, cartões, tempo real)
 │
 ├── mobile/                    (scaffold) app Flutter
 │
@@ -358,8 +371,11 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
 - **Fase 1 — HIL de ponta a ponta:** compilar/flashar o firmware; `central_
   sensores.py` alimentando o ESP32; ESP32 publicando no Mosquitto; validar com
   o `sink` da PoC.
-- **Fase 2 — Ingestão + Dashboard Web:** backend Fastify persistindo série
-  temporal; dashboard Next.js legível para leigos, com gráficos e alertas.
+- **Fase 2 — Ingestão + Dashboard Web:** **MVP pronto e validado** — backend
+  Node (assina o broker, valida o contrato v1.1, detecta lacunas, série em
+  memória, REST + WebSocket) e painel web legível para leigos (verdito por cor,
+  cartões, sparklines, tempo real) em [`dashboard/`](dashboard/README.md).
+  Evolução: Fastify + Prisma + série temporal + Next.js (padrão Painel_UFG).
 - **Fase 3 — Mobile + Alertas:** app Flutter; alertas Telegram/e-mail; endpoint
   `/metrics`.
 - **Fase 4 — Físico + Nuvem:** montar shield PCB e case; trocar `MODO_SENSOR`
@@ -379,5 +395,13 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
   Strategy sim/físico (esqueleto para compilar no seu ambiente).
 - **PoC de carga** continua funcional (agora emitindo v1.1).
 
-Os scaffolds de `dashboard/`, `mobile/` e `hardware/` trazem README com o plano
-detalhado e os pontos de reuso, prontos para as Fases 2–4.
+- **Dashboard Fase 2 (MVP)** em [`dashboard/`](dashboard/README.md): backend de
+  ingestão (MQTT → validação v1.1 → REST + WebSocket) e painel web legível para
+  leigos (verdito por cor, cartões, sparklines, tempo real). Validado ponta a
+  ponta contra o Mosquitto.
+- **Projeto da PCB** em [`hardware/pcb`](hardware/pcb/README.md): arquitetura,
+  pinagem completa, netlist, BOM e a **estratégia de alimentação** (fonte ≥ 1 A,
+  bulk no 5 V, e o **divisor de tensão** do MiCS-5524) para o EasyEDA Pro.
+
+Os scaffolds de `mobile/` e `hardware/case/` trazem README com o plano detalhado
+e os pontos de reuso, prontos para as Fases 3–4.

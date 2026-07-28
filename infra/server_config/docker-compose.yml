@@ -129,7 +129,10 @@ services:
   # no PostgreSQL; nas execucoes seguintes, volte para false.
   #   INSTALL_TB=true LOAD_DEMO=true docker compose --profile plataforma up -d
   thingsboard:
-    image: thingsboard/tb-node:3.8.1CE
+    # Confirme a tag mais recente em hub.docker.com/r/thingsboard/tb-node/tags.
+    # (Alternativa mais simples p/ instância única: thingsboard/tb-postgres, que
+    #  embute o PostgreSQL — trocaria também o serviço 'postgres' abaixo.)
+    image: thingsboard/tb-node:3.9.0
     container_name: qar-thingsboard
     restart: unless-stopped
     profiles: ["plataforma"]

@@ -1,0 +1,16 @@
+{
+  "name": "qar-ingestao",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ingestao MVP: assina o broker MQTT, valida o contrato v1.1, guarda serie temporal e serve o dashboard (REST + WebSocket).",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "mqtt": "^5.10.1",
+    "ws": "^8.18.0"
+  }
+}

@@ -71,6 +71,11 @@
 #define PMS_UART_RX   16   // ESP32 RX  <- PMS7003 TX
 #define PMS_UART_TX   17   // ESP32 TX  -> PMS7003 RX
 #define MICS_ADC_PIN  34   // MiCS-5524 VOUT (GPIO34 = ADC1, so entrada)
+// O VOUT do MiCS (alimentado em 5 V) passa por um DIVISOR ÷2 (2x10k) antes do
+// GPIO34, para nunca exceder 3.3 V. Multiplique a leitura por este fator para
+// recuperar a tensao real. Ver hardware/pcb/README.md §2.3.
+#define MICS_DIVISOR  2.0f
+#define ADC_VREF      3.3f   // tensao de referencia efetiva do ADC (aprox.)
 
 // -----------------------------------------------------------------------------
 // Limiares de qualidade do ar (derivam o gas_status; ver contrato)

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Qualidade do Ar — Painel</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">🌬️ <strong>Qualidade do Ar</strong></div>
+    <div class="controles">
+      <select id="seletorDispositivo" title="Dispositivo"></select>
+      <span id="conexao" class="conexao off">conectando…</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Veredito grande, legivel por qualquer pessoa -->
+    <section id="veredito" class="veredito bom">
+      <div class="veredito-emoji" id="vEmoji">🙂</div>
+      <div class="veredito-texto">
+        <div class="veredito-titulo" id="vTitulo">Ar bom</div>
+        <div class="veredito-acao" id="vAcao">Ambiente saudável.</div>
+      </div>
+      <div class="veredito-quando" id="vQuando"></div>
+    </section>
+
+    <!-- Cartoes por grandeza -->
+    <section class="grade" id="grade"></section>
+
+    <footer class="rodape">
+      <span id="metricas"></span>
+      <span class="dica">Verde = bom · Amarelo = ventile · Vermelho = perigo</span>
+    </footer>
+  </main>
+
+  <script src="/config.js"></script>
+  <script src="/charts.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
