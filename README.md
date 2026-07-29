@@ -1,6 +1,6 @@
-#Atividade 3 - Planejamento da Arquitetura de Ingestão de Dados em Iot#
+#Atividade 3 - Planejamento da Arquitetura de Ingestão de Dados em Iot
 
-###Descrição do projeto###
+###Descrição do projeto
 
 Esse repositório contém a solução desenvolvida para a Atividade 3 da disciplina, cujo objetivo é propor e demonstrar uma arquitetura de Internet das Coisas capaz de receber, processar, armazenar e monitorar dados enviados por milhares de sensores.
 
@@ -14,7 +14,7 @@ O cenário considera a situação de Monitoramento de Qualidade do Ar, utilizand
 
 A solução contempla uma prova de conceito(PoC) local e um planejamento de implantação utilizando serviços da Amazon Web Services
 
-###Objetivos###
+###Objetivos
 
  - simular o envio simultâneo de mensagens por milhares de dispositivos IoT
  - definir uma estrutura padronizada para as mensagens
@@ -25,7 +25,7 @@ A solução contempla uma prova de conceito(PoC) local e um planejamento de impl
  - analisar aspectos de segurança, desempenho e custos
 
 
- ###Arquitetura Proposta###
+ ###Arquitetura Proposta
 
  Sensores IoT -> Broker Mosquitto(local) -> Fila Amazon SQS -> AWS Lambda -> Amazon DynamoDB e S3 -> Dashboard e monitoramento
 
@@ -33,7 +33,7 @@ A solução contempla uma prova de conceito(PoC) local e um planejamento de impl
  [`Documentação da arquitetura`](ARQUITETURA.md)
 
 
- ###Estrutura das mensagens###
+ ###Estrutura das mensagens
 
 
 Exemplo: 
@@ -55,9 +55,9 @@ Exemplo:
       "humidity_pct": 50.0
     }
 
-###Tecnologias utilizadas###
+###Tecnologias utilizadas
 
-####PoC Local####
+####PoC Local
 
 Python
 Paho MQTT 2.0+ 
@@ -72,7 +72,7 @@ CLI
 [`Documentação do POC`](poc/README.md)
 
 
-####Planejamento em nuvem####
+####Planejamento em nuvem
 
 Amazon Iot Core
 Amazon SQS + DLQ
