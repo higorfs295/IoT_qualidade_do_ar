@@ -25,7 +25,7 @@ A solução contempla uma prova de conceito(PoC) local e um planejamento de impl
  - analisar aspectos de segurança, desempenho e custos
 
 
- ###Arquitetura Proposta
+ ### Arquitetura Proposta
 
  Sensores IoT -> Broker Mosquitto(local) -> Fila Amazon SQS -> AWS Lambda -> Amazon DynamoDB e S3 -> Dashboard e monitoramento
 
@@ -83,4 +83,11 @@ Amazon API Gateway
 Amazon CloudWatch
 AWS IAM
 
-[`Documentação do planejamento AWSa`](infra/aws/planejamento_servicos.md)
+[`Documentação do planejamento AWS`](infra/aws/planejamento_servicos.md)
+
+
+### Estimativa de Carga
+
+Previsão do volue de dados gerado pelos Sistema IoT com variados números de sensores
+
+[`Estimativa de Carga`](docs/estimativa_carga.md)
