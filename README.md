@@ -91,3 +91,21 @@ AWS IAM
 Previsão do volue de dados gerado pelos Sistema IoT com variados números de sensores
 
 [`Estimativa de Carga`](docs/estimativa_carga.md)
+
+### Slides da Apresentação
+
+[`Apresentação`](docs/apresentacao_slides.pdf)
+
+
+### Professor da matéria
+
+IWENS GERVASIO SENE JUNIOR
+
+
+### Participantes
+
+HIGOR FERREIRA SILVA
+KHALIL ALVES MOTTA
+LOURENÇO TABOSA PANIAGO
+WILSON MARANHÃO RAMOS FILHO
+
