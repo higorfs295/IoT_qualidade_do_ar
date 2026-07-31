@@ -6,6 +6,8 @@
 #include <ArduinoJson.h>
 #include <MQTT.h>
 #include <WiFi.h>
+#include <esp_system.h>
+#include <sys/time.h>
 #include <time.h>
 
 #ifdef MQTT_TLS
@@ -15,18 +17,20 @@ static WiFiClientSecure rede;
 static WiFiClient rede;
 #endif
 
-static MQTTClient mqtt(1024);
+static MQTTClient mqtt(MQTT_BUFFER_SIZE);
+static char payload[MQTT_PAYLOAD_MAX];
 
 // ULID canonico: 48 bits de timestamp em ms + 80 bits aleatorios, codificados
 // em Crockford Base32. Os dois bits mais altos dos 130 bits de texto sao zero.
-static String gerarUlid() {
+static void gerarUlid(char id[27]) {
   static const char* B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
   uint8_t bytes[16];
-  uint64_t ms = static_cast<uint64_t>(time(nullptr)) * 1000ULL + millis() % 1000ULL;
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
+  uint64_t ms = static_cast<uint64_t>(tv.tv_sec) * 1000ULL + tv.tv_usec / 1000ULL;
   for (int i = 5; i >= 0; --i) { bytes[i] = ms & 0xFF; ms >>= 8; }
   esp_fill_random(bytes + 6, 10);
 
-  char id[27];
   for (int grupo = 0; grupo < 26; ++grupo) {
     uint8_t valor = 0;
     for (int bit = 0; bit < 5; ++bit) {
@@ -37,16 +41,13 @@ static String gerarUlid() {
     id[grupo] = B32[valor];
   }
   id[26] = '\0';
-  return String(id);
 }
 
-static String agoraRfc3339() {
+static void agoraRfc3339(char saida[21]) {
   time_t agora = time(nullptr);
   struct tm tmUtc;
   gmtime_r(&agora, &tmUtc);
-  char buf[25];
-  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tmUtc);
-  return String(buf);
+  strftime(saida, 21, "%Y-%m-%dT%H:%M:%SZ", &tmUtc);
 }
 
 bool PublicadorMqtt::relogioValido() const {
@@ -66,7 +67,7 @@ bool PublicadorMqtt::conectarWiFi() {
 
 bool PublicadorMqtt::conectarBroker() {
   if (mqtt.connected()) return true;
-  if (WiFi.status() != WL_CONNECTED) return false;
+  if (WiFi.status() != WL_CONNECTED || !_tlsPronto) return false;
   const unsigned long agora = millis();
   if (_ultimaTentativaMqttMs && agora - _ultimaTentativaMqttMs < MQTT_RECONNECT_MS)
     return false;
@@ -76,31 +77,49 @@ bool PublicadorMqtt::conectarBroker() {
   const char* pass = strlen(MQTT_PASS) ? MQTT_PASS : nullptr;
   bool ok = user ? mqtt.connect(DEVICE_ID, user, pass) : mqtt.connect(DEVICE_ID);
   if (ok) {
-    String status = String(TOPICO_PREFIXO) + "/" + SITE_ID + "/" + DEVICE_ID + "/status";
-    mqtt.publish(status, "online", true, MQTT_QOS);
+    char status[MQTT_TOPIC_MAX];
+    if (montarTopico(status, sizeof(status), SITE_ID, DEVICE_ID, "status"))
+      mqtt.publish(status, "online", true, MQTT_QOS);
   }
   return ok;
 }
 
 void PublicadorMqtt::iniciar() {
   WiFi.mode(WIFI_STA);
+  WiFi.persistent(false);
   WiFi.setHostname(DEVICE_ID);
   WiFi.setAutoReconnect(true);
 #ifdef MQTT_TLS
   if (strlen(MQTT_CA_CERT) == 0) {
     Serial.println("[erro] MQTT_TLS ativo, mas MQTT_CA_CERT esta vazio");
+    _tlsPronto = false;
   } else {
     rede.setCACert(MQTT_CA_CERT);
+  }
+#ifdef MQTT_MTLS
+  if (strlen(MQTT_CLIENT_CERT) == 0 || strlen(MQTT_PRIVATE_KEY) == 0) {
+    Serial.println("[erro] MQTT_MTLS ativo, mas certificado/chave estao vazios");
+    _tlsPronto = false;
+  } else {
+    rede.setCertificate(MQTT_CLIENT_CERT);
+    rede.setPrivateKey(MQTT_PRIVATE_KEY);
+  }
+#endif
+#endif
+#ifdef CLOUD_PROVIDER_AWS
+  if (MQTT_PORT != 8883) {
+    Serial.println("[erro] ambiente AWS exige MQTT_PORT=8883");
+    _tlsPronto = false;
   }
 #endif
   mqtt.begin(MQTT_HOST, MQTT_PORT, rede);
   mqtt.setOptions(MQTT_KEEPALIVE, true, 3000);
-  String status = String(TOPICO_PREFIXO) + "/" + SITE_ID + "/" + DEVICE_ID + "/status";
-  mqtt.setWill(status.c_str(), "offline", true, MQTT_QOS);
+  char status[MQTT_TOPIC_MAX];
+  if (montarTopico(status, sizeof(status), SITE_ID, DEVICE_ID, "status"))
+    mqtt.setWill(status, "offline", true, MQTT_QOS);
 
   conectarWiFi();
   configTime(0, 0, "pool.ntp.org", "time.google.com", "time.cloudflare.com");
-  _bootId = gerarUlid();
 }
 
 void PublicadorMqtt::manter() {
@@ -116,13 +135,22 @@ bool PublicadorMqtt::conectado() { return mqtt.connected(); }
 
 bool PublicadorMqtt::publicar(const Leitura& l) {
   if (!mqtt.connected() || !relogioValido()) return false;
+  if (ESP.getFreeHeap() < MIN_FREE_HEAP_BYTES) {
+    Serial.printf("[erro] heap insuficiente para publicar: %u bytes\n", ESP.getFreeHeap());
+    return false;
+  }
+  if (_bootId[0] == '\0') gerarUlid(_bootId);  // somente depois do NTP valido
 
   JsonDocument doc;
   doc["schema_version"] = SCHEMA_VERSION_STR;
-  doc["message_id"] = gerarUlid();
+  char messageId[27];
+  gerarUlid(messageId);
+  doc["message_id"] = messageId;
   doc["device_id"] = DEVICE_ID;
   doc["site_id"] = SITE_ID;
-  doc["sent_at"] = agoraRfc3339();
+  char sentAt[21];
+  agoraRfc3339(sentAt);
+  doc["sent_at"] = sentAt;
   doc["sequence"] = ++_sequence;
 
   JsonObject m = doc["measurements"].to<JsonObject>();
@@ -157,12 +185,20 @@ bool PublicadorMqtt::publicar(const Leitura& l) {
   JsonObject meta = doc["metadata"].to<JsonObject>();
   meta["firmware_version"] = FIRMWARE_VERSION;
   meta["boot_id"] = _bootId;
+  meta["board_model"] = BOARD_MODEL;
+  meta["hardware_revision"] = HARDWARE_REVISION;
   meta["rssi_dbm"] = WiFi.RSSI();
   meta["sensor_mode"] = MODO_SENSOR == FONTE_SIMULADA ? "HIL" : "PHYSICAL";
+  meta["free_heap_bytes"] = ESP.getFreeHeap();
+  meta["min_free_heap_bytes"] = ESP.getMinFreeHeap();
+  meta["max_alloc_heap_bytes"] = ESP.getMaxAllocHeap();
+  meta["uptime_s"] = millis() / 1000UL;
+  meta["reset_reason"] = static_cast<int>(esp_reset_reason());
 
-  char payload[1024];
+  if (doc.overflowed() || measureJson(doc) >= sizeof(payload)) return false;
   size_t n = serializeJson(doc, payload, sizeof(payload));
   if (n == 0 || n >= sizeof(payload)) return false;
-  String topico = montarTopico(SITE_ID, DEVICE_ID);
-  return mqtt.publish(topico.c_str(), payload, static_cast<int>(n), false, MQTT_QOS);
+  char topico[MQTT_TOPIC_MAX];
+  if (!montarTopico(topico, sizeof(topico), SITE_ID, DEVICE_ID)) return false;
+  return mqtt.publish(topico, payload, static_cast<int>(n), false, MQTT_QOS);
 }

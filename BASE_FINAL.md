@@ -109,7 +109,7 @@ falhas, coerente com a Atividade 1 que já usava SCD41):
 | **Partículas PM1/2.5/10** | **Plantower PMS7003** | UART2 | compacto, baixo consumo, **adiciona PM1.0** (vs. PMS5003/SDS011) |
 | **GLP / combustíveis** | **MiCS-5524** | Analógico (ADC1) | MEMS: menor, menos corrente e calor que os resistivos MQ-5/MQ-6 |
 
-**Mapa de barramentos no ESP32 DevKit V1:**
+**Mapa de barramentos no ESP-WROOM-32 DevKit 30P USB-C:**
 
 | Recurso | Pino(s) | Ligado a |
 |---|---|---|
@@ -128,9 +128,10 @@ falhas, coerente com a Atividade 1 que já usava SCD41):
 
 - **5 V** para ventoinha (PMS7003) e aquecedor (MiCS-5524); **3.3 V** para os
   três sensores I2C (Sensirion).
-- **Use fonte USB de ≥ 1 A** (não a porta de um PC, que dá 500 mA): Wi-Fi +
-  ventoinha + o pico de ~205 mA do SCD41 na medição estouram 500 mA. Some um
-  **capacitor bulk de 470–1000 µF** no 5 V para evitar brownout/reset.
+- No modo físico, use a entrada externa regulada de **5 V/2 A** da shield e
+  feche `JP1` somente com o USB desconectado. Para gravação/debug, deixe `JP1`
+  aberto e alimente apenas pelo USB-C. A Rev A não autoriza as duas fontes ao
+  mesmo tempo. O capacitor bulk especificado é de **1000 µF** no rail de 5 V.
 - **Redutor de tensão (obrigatório):** o VOUT analógico do MiCS-5524 pode chegar
   perto de 5 V e queimaria o GPIO34 (máx. 3.3 V). A revisão atual usa
   **15 kΩ/10 kΩ (ganho 0,4) + RC**. O firmware multiplica a leitura por
@@ -142,7 +143,8 @@ falhas, coerente com a Atividade 1 que já usava SCD41):
 
 ## 4. O protótipo físico: ESP32, shield PCB e case
 
-- **ESP32 real**: um único DevKit V1 executa o firmware real (sim ou físico).
+- **ESP32 real**: DevKit de 30 pinos com módulo Wi-Fi ESP-WROOM-32 e USB-C;
+  executa o mesmo firmware em HIL, físico ou AWS.
 - **Shield PCB** (prototipada): uma placa que encaixa sobre o ESP32 e organiza
   I2C (com pull-ups de 4.7 kΩ), a UART do PMS7003, a entrada ADC do MiCS-5524,
   alimentação (5 V para ventoinha/heater, 3.3 V para I2C) e conectores JST para
@@ -233,8 +235,9 @@ produziria. A partir daí, aplicação e rede não distinguem sim de físico.
         └──► [Alertas]  regras de limiar → Telegram/e-mail (futuro)
 ```
 
-- **Broker:** Mosquitto (já pronto em [`infra/server_config`](infra/server_config)),
-  com caminho de migração para AWS IoT Core via bridge.
+- **Broker:** Mosquitto (já pronto em [`infra/server_config`](infra/server_config))
+  ou conexão mTLS direta com AWS IoT Core. O sandbox reproduzível está em
+  [`infra/aws/`](infra/aws/).
 - **Ingestão:** serviço Node/Fastify (padrão do Painel_UFG) que assina
   `qualidade-ar/#`, valida com o contrato, grava série temporal e serve os
   dashboards por REST + WebSocket/SSE (tempo real).
@@ -248,11 +251,10 @@ produziria. A partir daí, aplicação e rede não distinguem sim de físico.
 
 ## 8. Firmware (a camada de abstração)
 
-Estrutura em [`firmware/`](firmware/) (PlatformIO + Arduino, evoluindo o
-firmware das atividades). **Cautela:** os arquivos são um **esqueleto
-cuidadosamente estruturado**, com pinos, endereços e uso de bibliotecas
-corretos, porém **não foram compilados/flashados aqui** — compile e valide no
-seu ambiente (mesma convenção do seu firmware do IoT-IDEA).
+Estrutura em [`firmware/`](firmware/) (PlatformIO + Arduino). Os ambientes
+`esp32-hil`, `esp32-fisico` e `esp32-aws` foram compilados para
+`esp32doit-devkit-v1`; flash, sensores, pinout rotulado e alimentação ainda
+exigem validação na unidade física.
 
 | Arquivo | Papel |
 |---|---|
@@ -374,8 +376,8 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
 ## 14. Roadmap por fases
 
 - **Fase 0 — Base (esta branch):** blueprint, contrato v1.1, firmware HAL
-  (esqueleto), simulador HIL serial, scaffolds documentados. ✅
-- **Fase 1 — HIL de ponta a ponta:** compilar/flashar o firmware; `central_
+  compilável, simulador HIL serial, backend, dashboard e sandbox AWS local. ✅
+- **Fase 1 — HIL de ponta a ponta:** flashar o firmware; `central_
   sensores.py` alimentando o ESP32; ESP32 publicando no Mosquitto; validar com
   o `sink` da PoC.
 - **Fase 2 — Ingestão + Dashboard Web:** **MVP pronto e validado** — backend
@@ -398,8 +400,8 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
   gera cenários coerentes (normal, pico de poluição, incêndio, vazamento de GLP)
   e emite NDJSON — com modo `--dry-run` (imprime os quadros) que roda sem
   hardware, e modo serial (`--porta COMx`) para alimentar o ESP32.
-- **Firmware HAL** [`firmware/src/`](firmware/src/): estrutura completa do
-  Strategy sim/físico (esqueleto para compilar no seu ambiente).
+- **Firmware HAL** [`firmware/src/`](firmware/src/): Strategy HIL/físico e perfil
+  AWS, todos compilados com partições OTA para flash de 4 MB.
 - **PoC de carga** continua funcional (agora emitindo v1.1).
 
 - **Dashboard Fase 2 (MVP)** em [`dashboard/`](dashboard/README.md): backend de

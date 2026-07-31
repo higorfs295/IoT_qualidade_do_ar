@@ -17,6 +17,37 @@ estado/API -> DynamoDB ou PostgreSQL, decidido por padrões de consulta
 observabilidade -> CloudWatch + alarmes + painel de custo
 ```
 
+Arquivos executáveis de referência desta revisão:
+
+- [`sandbox.template.json`](sandbox.template.json): CloudFormation para
+  IoT Rule, SQS/DLQ, S3 bruto, DynamoDB de estado e alarme de DLQ;
+- [`iot-policy-device.example.json`](iot-policy-device.example.json): política
+  mínima por Thing/atributo `siteId`;
+- [`iot-rule-sqs.example.json`](iot-rule-sqs.example.json): payload para criar a
+  regra isoladamente;
+- [`lambda_ingest/handler.py`](lambda_ingest/handler.py): validação em lote e
+  atualização idempotente do estado atual.
+
+Esses arquivos são templates: não contêm conta, região, endpoint, certificado
+ou chave e não foram aplicados a uma conta AWS nesta revisão.
+
+## Dois modos de conexão
+
+### Direto do ESP32 para o IoT Core
+
+Use o ambiente `esp32-aws`. Configure endpoint ATS, porta 8883, Amazon Root CA,
+certificado e chave exclusivos no `secrets.h`. O `DEVICE_ID` deve coincidir com
+Thing Name/MQTT client ID; o Thing precisa do atributo `siteId` igual a
+`SITE_ID`. Vantagem: menos infraestrutura local. Custo: TLS/certificados ocupam
+mais flash e heap, por isso o gate de memória é obrigatório.
+
+### Via Mosquitto de borda
+
+O ESP32 publica localmente e um gateway Linux mantém a conexão mTLS com a AWS.
+Isso centraliza certificados e fila offline, mas o gateway vira componente
+crítico e precisa de disco, backup de configuração, métricas e atualização. Não
+usar o mesmo certificado para vários gateways/dispositivos.
+
 ## Decisões por serviço
 
 ### IoT Core
@@ -25,6 +56,10 @@ observabilidade -> CloudWatch + alarmes + painel de custo
 - Tópicos mantêm o contrato v1.1; regra valida os campos mínimos e encaminha.
 - Definir comportamento de certificados revogados e rotação.
 - Medir limite de conexão/publicação e custo na região escolhida.
+- Não usar Device Shadow como histórico de telemetria. Shadow serve para estado
+  desejado/reportado e configuração; o fluxo S3/SQS preserva eventos.
+- O payload do ESP32 é limitado a 896 bytes por decisão de memória, embora o
+  serviço aceite mensagens maiores. Essa margem deve ser medida com o PEM real.
 
 ### SQS e DLQ
 
@@ -41,6 +76,8 @@ observabilidade -> CloudWatch + alarmes + painel de custo
 - Validação do JSON Schema e tópico, deduplicação condicional, lote com falha
   parcial e métricas por motivo de rejeição.
 - Nenhum payload inválido deve desaparecer: registrar quarentena sem segredos.
+- Ativar resposta parcial de lote SQS; um registro inválido não deve repetir o
+  lote inteiro.
 
 ### Persistência
 
@@ -73,6 +110,21 @@ Escolher CDK, Terraform ou CloudFormation e manter ambientes separados
 CI deve executar lint, synth/plan e análise de segurança. Apply de produção
 exige revisão humana e plano de rollback. Estado remoto e segredos não ficam no
 repositório.
+
+### Sequência segura do sandbox
+
+1. Selecionar região e configurar orçamento/alerta antes dos recursos.
+2. Validar o template e revisar o change set; criar a stack `dev`.
+3. Criar um Thing, atributo `siteId`, certificado exclusivo e anexar a política.
+4. Obter o endpoint ATS da conta e configurar `secrets.h` local.
+5. Compilar `pio run -e esp32-aws`; confirmar flash de 4 MB e margem OTA.
+6. Publicar uma fixture pelo cliente de teste AWS antes de ligar o ESP32.
+7. Verificar S3, SQS, consumidor, DynamoDB e CloudWatch de ponta a ponta.
+8. Revogar o certificado de teste e destruir a stack quando o experimento acabar
+   (o bucket tem `Retain`, portanto deve ser esvaziado/removido conscientemente).
+
+Não executar `cloudformation deploy` automaticamente em conta real: criação de
+recursos gera custo e requer escolha explícita de conta, região e responsável.
 
 ## Gates
 

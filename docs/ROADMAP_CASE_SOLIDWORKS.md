@@ -28,7 +28,8 @@ não deve ser a única fonte editável.
 Meça com paquímetro e registre em `hardware/case/parametros.csv`:
 
 - PCB: X/Y/espessura, furos e componentes mais altos por lado;
-- ESP32: envelope, antena, USB, EN/BOOT e raio de curvatura do cabo;
+- ESP32-WROOM-32 DevKit 30P: envelope, antena, USB-C, EN/BOOT e raio de
+  curvatura do cabo;
 - PMS7003: envelope, entrada, exaustão, conector e cabo conectado;
 - sensores I2C: envelope, abertura sensível e conectores;
 - módulo analógico: zonas quentes e ventilação;

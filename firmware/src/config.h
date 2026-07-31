@@ -24,19 +24,32 @@
 #include "secrets.example.h"
 #endif
 
+#ifndef MQTT_CLIENT_CERT
+#define MQTT_CLIENT_CERT ""
+#endif
+#ifndef MQTT_PRIVATE_KEY
+#define MQTT_PRIVATE_KEY ""
+#endif
+
 // -----------------------------------------------------------------------------
 // Identidade do dispositivo (entra no topico e no payload v1.1)
 // -----------------------------------------------------------------------------
 #define DEVICE_ID        "esp32-proto-01"
 #define SITE_ID          "campus-ufg-bloco-inf"
-#define FIRMWARE_VERSION "1.1.0"
+#define FIRMWARE_VERSION "1.2.0"
+#define BOARD_MODEL      "ESP-WROOM-32 DevKit 30P USB-C"
+#define HARDWARE_REVISION "PROTO-REV-A"
 
 // -----------------------------------------------------------------------------
-// MQTT (broker Mosquitto local; futuramente AWS IoT Core)
+// MQTT (broker Mosquitto local ou AWS IoT Core no ambiente esp32-aws)
 // -----------------------------------------------------------------------------
 #define MQTT_KEEPALIVE  60
 #define MQTT_QOS        1
 #define MQTT_RECONNECT_MS 5000UL
+#define MQTT_BUFFER_SIZE 896
+#define MQTT_PAYLOAD_MAX 896
+#define MQTT_TOPIC_MAX   160
+#define MIN_FREE_HEAP_BYTES 30000UL
 // #define MQTT_TLS                       // descomente p/ TLS 8883 (carregar CA)
 
 // -----------------------------------------------------------------------------
@@ -55,7 +68,8 @@
 #define LINHA_MAX          512
 
 // -----------------------------------------------------------------------------
-// Pinos fisicos (modo FONTE_FISICA) — ver mapa em BASE_FINAL.md §3
+// Pinos fisicos do DevKit 30P ESP-WROOM-32 informado pelo usuario.
+// Ver docs/PINOUT_ESP32_WROOM32_30P.md. Nenhum pino de strapping e usado.
 // -----------------------------------------------------------------------------
 #define I2C_SDA       21   // SHT31 (0x44), SGP40 (0x59), SCD41 (0x62)
 #define I2C_SCL       22
@@ -66,6 +80,12 @@
 // Multiplique a tensao no ADC por 2,5 para estimar a tensao antes do divisor.
 #define MICS_DIVISOR  2.5f
 #define MICS_AMOSTRAS_ADC 32
+
+#define PINO_STRAPPING(p) ((p) == 0 || (p) == 2 || (p) == 5 || (p) == 12 || (p) == 15)
+#if PINO_STRAPPING(I2C_SDA) || PINO_STRAPPING(I2C_SCL) || \
+    PINO_STRAPPING(PMS_UART_RX) || PINO_STRAPPING(PMS_UART_TX)
+#error "Pino de strapping selecionado; nao o use nestas interfaces"
+#endif
 
 // O MiCS-5524 nao fornece ppm diretamente. Sem uma curva obtida para o modulo,
 // carga e gas-alvo usados, o firmware publica apenas gas_raw_v e mantem

@@ -1,0 +1,16 @@
+Posicao_do_USB_para_antena,Lado_esquerdo_serigrafia,Lado_direito_informado,Identificacao_eletrica_direita,Observacao
+1,3V3,VIN,5V/VIN,alimentacao; nao usar simultaneamente com USB sem estrategia documentada
+2,GND,GND,GND,terra comum
+3,D15,D13,GPIO13,GPIO15 e strapping; manter livre no boot
+4,D2,D12,GPIO12,ambos strapping; GPIO12 e particularmente critico para tensao da flash
+5,D4,D14,GPIO14,GPIO4 e strapping
+6,D16,D27,GPIO27,GPIO16 usado como RX2 do PMS7003
+7,D17,D26,GPIO26,GPIO17 usado como TX2 do PMS7003
+8,D5,D25,GPIO25,GPIO5 e strapping
+9,D18,D33,GPIO33,GPIO geral
+10,D19,D32,GPIO32,GPIO geral
+11,D21,D35,GPIO35,GPIO21 usado como SDA; GPIO35 somente entrada
+12,RX0,D34,GPIO34,UART0 do USB; GPIO34 ADC1 somente entrada usado pelo MiCS
+13,TX0,VIN (ambiguidade),VN/GPIO39 provavel,nao conectar ate confirmar serigrafia e continuidade
+14,D22,VP,GPIO36/VP,GPIO22 usado como SCL; VP somente entrada ADC1
+15,D23,EN,CHIP_PU/RESET,EN nao e GPIO

@@ -22,8 +22,9 @@ class PublicadorMqtt {
   bool conectarWiFi();
   bool conectarBroker();
   bool relogioValido() const;
+  bool _tlsPronto = true;
   uint32_t _sequence = 0;        // sequencia crescente por dispositivo
   unsigned long _ultimaTentativaWiFiMs = 0;
   unsigned long _ultimaTentativaMqttMs = 0;
-  String _bootId;
+  char _bootId[27] = {0};
 };

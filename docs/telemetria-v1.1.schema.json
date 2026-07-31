@@ -20,7 +20,23 @@
       },
       "additionalProperties": true
     },
-    "metadata": { "type": "object" }
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "firmware_version": { "type": "string", "maxLength": 32 },
+        "boot_id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" },
+        "board_model": { "type": "string", "maxLength": 80 },
+        "hardware_revision": { "type": "string", "maxLength": 32 },
+        "rssi_dbm": { "type": "integer", "minimum": -127, "maximum": 0 },
+        "sensor_mode": { "enum": ["HIL", "PHYSICAL"] },
+        "free_heap_bytes": { "type": "integer", "minimum": 0 },
+        "min_free_heap_bytes": { "type": "integer", "minimum": 0 },
+        "max_alloc_heap_bytes": { "type": "integer", "minimum": 0 },
+        "uptime_s": { "type": "integer", "minimum": 0 },
+        "reset_reason": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    }
   },
   "allOf": [
     {

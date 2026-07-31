@@ -12,3 +12,9 @@
 // Para TLS, use a porta 8883, defina MQTT_TLS em config.h e cole a CA que
 // assinou o certificado do broker. Nunca use setInsecure() em producao.
 #define MQTT_CA_CERT ""
+
+// Necessários no ambiente `esp32-aws` (mTLS). O Thing Name e o MQTT client ID
+// devem ser iguais a DEVICE_ID. Para protótipo, cole PEMs exclusivos; em uma
+// frota, use provisionamento e proteção de flash/chaves.
+#define MQTT_CLIENT_CERT ""
+#define MQTT_PRIVATE_KEY ""

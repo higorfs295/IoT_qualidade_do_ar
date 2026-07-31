@@ -1,0 +1,8 @@
+Classe,Largura_inicial_mm,Clearance_inicial_mm,Via_diametro_mm,Via_furo_mm,Aplicacao
+POWER_5V,1.00,0.25,0.80,0.40,VIN 5 V PMS7003 MiCS e caminho ESP32
+POWER_3V3,0.60,0.20,0.70,0.35,sensores I2C e pull-ups
+GROUND,plano,0.20,0.80,0.40,plano continuo e vias de costura fora da antena
+I2C,0.25,0.20,0.60,0.30,SDA/SCL curtas e juntas
+UART,0.25,0.20,0.60,0.30,PMS RX/TX
+ANALOG,0.30,0.30,0.60,0.30,MiCS para GPIO34 longe de chaveamento/antena
+GPIO_UNUSED,0.25,0.20,0.60,0.30,somente se realmente roteado

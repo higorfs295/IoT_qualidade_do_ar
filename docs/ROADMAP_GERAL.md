@@ -9,7 +9,9 @@ Objetivo: qualquer integrante reproduz os testes.
 
 - [ ] Instalar Python 3.10+, Node 20+, PlatformIO e Docker Compose v2.
 - [ ] Copiar os arquivos `.env.example`/`secrets.example.h`, sem versionar segredos.
-- [ ] Executar testes Python/Node e builds HIL/físico.
+- [ ] Executar testes Python/Node e builds HIL/físico/AWS.
+- [ ] Confirmar no módulo real: 4 MB de flash, variante ESP-WROOM-32, pinout de
+  30 pinos e se o segundo rótulo `VIN` é, na verdade, `VN/GPIO39`.
 - [ ] Registrar versões de ferramentas e hash do commit no relatório de ensaio.
 
 Saída: todos os comandos do README passam em uma segunda máquina.
@@ -41,7 +43,8 @@ Saída: cada sensor tem ficha de aceite; nenhuma conversão ppm é presumida.
 Seguir [`ROADMAP_HARDWARE_EASYEDA.md`](ROADMAP_HARDWARE_EASYEDA.md).
 
 - [ ] Medir o DevKit e conectores reais.
-- [ ] Fechar arquitetura de alimentação sem backfeed USB.
+- [ ] Fechar arquitetura de alimentação sem backfeed USB e registrar a posição
+  de `JP1` para modo USB ou modo autônomo.
 - [ ] Criar/revisar símbolos e footprints.
 - [ ] ERC, revisão por pares, layout, DRC e Gerbers.
 - [ ] Fabricar poucas unidades e executar bring-up com fonte limitada.
@@ -69,7 +72,20 @@ Saída: STL revisado, desenho cotado e fotos da montagem.
 
 Saída: release demonstrável por 7 dias sem intervenção manual.
 
-## Fase 6 — piloto e revisão final
+## Fase 6 — sandbox AWS e operação de frota
+
+- [ ] Aplicar o template de [`../infra/aws/`](../infra/aws/) em conta sandbox.
+- [ ] Criar um Thing/certificado por unidade e anexar política de menor privilégio.
+- [ ] Gravar `esp32-aws`, validar mTLS, QoS 1, SQS/DLQ, S3 e estado idempotente.
+- [ ] Exercitar expiração/revogação de certificado, reprocessamento da DLQ e
+  alarmes de custo antes de aumentar a frota.
+- [ ] Definir provisioning em escala e OTA; a tabela de partições já suporta
+  duas imagens, mas o cliente de atualização ainda deve ser implementado.
+
+Saída: uma unidade opera no sandbox sem segredo no repositório e com recuperação
+documentada de falhas.
+
+## Fase 7 — piloto e revisão final
 
 - [ ] Instalar em local controlado, com consentimento e aviso de protótipo.
 - [ ] Operar 30 dias, acompanhar drift, disponibilidade e falsos alertas.

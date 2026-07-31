@@ -1,0 +1,24 @@
+{
+  "ruleName": "qar_telemetry_v11",
+  "topicRulePayload": {
+    "awsIotSqlVersion": "2016-03-23",
+    "ruleDisabled": false,
+    "sql": "SELECT *, topic() AS mqtt_topic, timestamp() AS ingested_at FROM 'qualidade-ar/+/+/telemetria'",
+    "actions": [
+      {
+        "sqs": {
+          "queueUrl": "SQS_QUEUE_URL",
+          "roleArn": "IOT_RULE_ROLE_ARN",
+          "useBase64": false
+        }
+      }
+    ],
+    "errorAction": {
+      "sqs": {
+        "queueUrl": "SQS_DLQ_URL",
+        "roleArn": "IOT_RULE_ROLE_ARN",
+        "useBase64": false
+      }
+    }
+  }
+}

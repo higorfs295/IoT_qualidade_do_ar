@@ -79,6 +79,12 @@ Gate: paridade de regra e estado com o web usando os mesmos fixtures.
 
 - Começar com um único ambiente pequeno e infraestrutura como código.
 - AWS IoT Core -> regra -> SQS/DLQ -> consumidor idempotente -> banco/data lake.
+- A base executável está em [`../infra/aws/`](../infra/aws/): template
+  CloudFormation do sandbox, política por Thing, regra de roteamento e consumidor
+  Lambda de referência.
+- Para conexão direta, compilar `esp32-aws` com mTLS e limitar buffers/telemetria;
+  para uma frota local, avaliar Mosquitto de borda como concentrador antes de
+  impor TLS e certificados a cada nó.
 - Orçamento e alarmes de custo antes do benchmark.
 - Retenção por classe, criptografia, IAM mínimo e logs de auditoria.
 - Testar reprocessamento da DLQ e recuperação regional antes do piloto.

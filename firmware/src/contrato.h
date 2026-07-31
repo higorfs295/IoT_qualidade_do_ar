@@ -7,12 +7,16 @@
 // =============================================================================
 #pragma once
 #include <Arduino.h>
+#include <stdio.h>
 
 #define SCHEMA_VERSION_STR  "1.1"
 #define TOPICO_PREFIXO      "qualidade-ar"
 #define TOPICO_SUFIXO       "telemetria"
 
-// qualidade-ar/{site_id}/{device_id}/telemetria
-inline String montarTopico(const char* site, const char* device) {
-  return String(TOPICO_PREFIXO) + "/" + site + "/" + device + "/" + TOPICO_SUFIXO;
+// Monta sem String dinamica para reduzir fragmentacao de heap no ESP32.
+inline bool montarTopico(char* destino, size_t capacidade, const char* site,
+                         const char* device, const char* sufixo = TOPICO_SUFIXO) {
+  const int n = snprintf(destino, capacidade, "%s/%s/%s/%s",
+                         TOPICO_PREFIXO, site, device, sufixo);
+  return n > 0 && static_cast<size_t>(n) < capacidade;
 }

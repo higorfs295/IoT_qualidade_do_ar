@@ -1,6 +1,7 @@
 # Estação IoT de Qualidade do Ar
 
-Estação experimental baseada em ESP32 para monitorar CO₂, partículas, VOC,
+Estação experimental baseada no **DevKit USB-C de 30 pinos com módulo Wi-Fi
+ESP-WROOM-32** para monitorar CO₂, partículas, VOC,
 temperatura e umidade, com firmware alternável entre sensores simulados
 (Hardware-in-the-Loop) e físicos, telemetria MQTT, ingestão em tempo real e
 dashboard web.
@@ -17,6 +18,7 @@ dashboard web.
 |---|---|---|
 | Firmware HIL | implementado e compilado | flash no ESP32 + teste serial |
 | Firmware físico | implementado e compilado | bancada sensor a sensor + calibração |
+| Firmware AWS | TLS/mTLS implementado e compilado | certificado real + IoT Core sandbox |
 | Simulador HIL | implementado; self-test aprovado | teste com porta serial real |
 | Contrato v1.1 | validadores Python/Node e testes aprovados | compatibilidade em bancada |
 | Backend | MVP funcional em memória; teste HTTP aprovado | persistência e autenticação de produção |
@@ -32,17 +34,18 @@ Detalhes e evidências: [`docs/STATUS_PROJETO.md`](docs/STATUS_PROJETO.md).
 
 ```text
 Central HIL (PC) --NDJSON/USB--┐
-                              ├--> ESP32/HAL --> MQTT QoS 1 --> Mosquitto
+                              ├--> ESP32/HAL --> MQTT QoS 1 --> Mosquitto/backend/web
 Sensores físicos I2C/UART/ADC-┘                            |
-                                                            +--> backend
-                                                                 |-- REST
-                                                                 |-- WebSocket
-                                                                 +--> dashboard web
+                                                            +--> AWS IoT Core
+                                                                 |-- Rule -> SQS/DLQ
+                                                                 |-- S3 bruto
+                                                                 +-- consumidor -> DynamoDB
 ```
 
 O padrão Strategy mantém a aplicação independente da fonte dos sensores. O
 ambiente `esp32-hil` lê quadros do simulador; `esp32-fisico` lê SHT31, SGP40,
-SCD41, PMS7003 e a entrada analógica. Ambos geram o mesmo payload v1.1.
+SCD41, PMS7003 e a entrada analógica; `esp32-aws` adiciona TLS/mTLS para o IoT
+Core. Todos geram o mesmo payload v1.1.
 
 ## Início rápido: demonstração sem hardware
 
@@ -96,6 +99,7 @@ deve ser usado em rede local isolada.
 cd firmware
 pio run -e esp32-hil
 pio run -e esp32-fisico
+pio run -e esp32-aws
 ```
 
 3. Para HIL, grave o primeiro ambiente e execute:
@@ -109,6 +113,11 @@ O firmware só publica depois de obter horário NTP válido, usa ULID canônico,
 inclui `boot_id` e publica com QoS 1 real. Instruções completas:
 [`firmware/README.md`](firmware/README.md) e
 [`docs/ROADMAP_FIRMWARE.md`](docs/ROADMAP_FIRMWARE.md).
+
+Pinagem consolidada: GPIO21/22 para I²C, GPIO16/17 para PMS7003 e GPIO34/ADC1
+para o canal analógico. O segundo `VIN` informado é **VN/GPIO39 provável** e
+não deve receber 5 V antes de confirmação física:
+[`docs/PINOUT_ESP32_WROOM32_30P.md`](docs/PINOUT_ESP32_WROOM32_30P.md).
 
 ## Contrato de telemetria
 
@@ -136,10 +145,15 @@ Payload resumido:
     "pm25_ugm3": 9.0,
     "pm10_ugm3": 14.0,
     "temperature_c": 24.2,
-    "humidity_pct": 51.0
+    "humidity_pct": 51.0,
+    "gas_raw_v": 2.1
   },
   "quality": { "gas_status": "SAFE", "sensor_status": "DEGRADED" },
-  "metadata": { "firmware_version": "1.1.0", "boot_id": "..." }
+  "metadata": {
+    "firmware_version": "1.2.0",
+    "boot_id": "01JQ7PK0P3R7V5BT7P0Q9YQ8A2",
+    "board_model": "ESP-WROOM-32 DevKit 30P USB-C"
+  }
 }
 ```
 
@@ -168,13 +182,16 @@ docs/           contrato, status, testes, roadmaps e artefatos finais
 - [`docs/ROADMAP_SOFTWARE.md`](docs/ROADMAP_SOFTWARE.md) — backend, web, mobile e nuvem.
 - [`docs/ROADMAP_HARDWARE_EASYEDA.md`](docs/ROADMAP_HARDWARE_EASYEDA.md) — esquemático e PCB no EasyEDA Pro.
 - [`docs/ROADMAP_CASE_SOLIDWORKS.md`](docs/ROADMAP_CASE_SOLIDWORKS.md) — case paramétrico no SolidWorks.
+- [`docs/PINOUT_ESP32_WROOM32_30P.md`](docs/PINOUT_ESP32_WROOM32_30P.md) — pinout e restrições GPIO.
+- [`docs/MEMORIA_ESP32_WROOM32.md`](docs/MEMORIA_ESP32_WROOM32.md) — flash, OTA, heap e buffers.
 - [`docs/PLANO_TESTES.md`](docs/PLANO_TESTES.md) — matriz de verificação e aceite.
 - [`docs/estimativa_carga.md`](docs/estimativa_carga.md) — volumetria e fórmulas.
 - [`docs/estimativa_carga.xlsx`](docs/estimativa_carga.xlsx) — calculadora editável com cenários e gráfico.
-- [`docs/arquitetura_solucao.pdf`](docs/arquitetura_solucao.pdf) — dossiê técnico diagramado.
-- [`docs/apresentacao_slides.pdf`](docs/apresentacao_slides.pdf) — apresentação executiva em 11 páginas.
+- [`docs/arquitetura_solucao.pdf`](docs/arquitetura_solucao.pdf) — dossiê técnico diagramado em 10 páginas.
+- [`docs/apresentacao_slides.pdf`](docs/apresentacao_slides.pdf) — apresentação executiva em 12 páginas.
 - [`docs/telemetria-v1.1.schema.json`](docs/telemetria-v1.1.schema.json) — JSON Schema do contrato.
 - [`docs/modelagem_dados.json`](docs/modelagem_dados.json) — modelo lógico para a persistência.
+- [`infra/aws/planejamento_servicos.md`](infra/aws/planejamento_servicos.md) — IoT Core, SQS/DLQ, S3 e DynamoDB.
 - [`ARQUITETURA.md`](ARQUITETURA.md) — histórico detalhado da PoC de ingestão.
 - [`BASE_FINAL.md`](BASE_FINAL.md) — blueprint original da evolução do projeto.
 

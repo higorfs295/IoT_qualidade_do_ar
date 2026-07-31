@@ -6,13 +6,15 @@
 |---|---|---|---|
 | `esp32-hil` | NDJSON na UART0/USB | nenhuma de sensor | integração e regressão |
 | `esp32-fisico` | I2C, UART2 e ADC1 | SHT31, SCD4x, SGP40, Gas Index | bancada/protótipo |
+| `esp32-aws` | sensores físicos | bibliotecas físicas + TLS/mTLS | IoT Core sandbox |
 
 Passos:
 
 1. Copiar `include/secrets.example.h` para `include/secrets.h`.
 2. Configurar identidade, intervalos e pinos em `src/config.h`.
-3. Compilar os dois ambientes antes de qualquer release.
-4. Nunca incluir `secrets.h`, certificados privados ou binários no commit.
+3. Compilar os três ambientes antes de qualquer release.
+4. Confirmar flash física de 4 MB antes de usar a tabela OTA.
+5. Nunca incluir `secrets.h`, certificados privados ou binários no commit.
 
 ## 2. Gate HIL
 
@@ -69,19 +71,35 @@ Passos:
 - Manter `lpg_ppm=null` até obter curva do conjunto real com gás certificado,
   procedimento seguro, temperatura/umidade registradas e repetibilidade.
 
-## 4. Robustez a implementar após a Rev A
+## 4. Robustez e memória
 
 - Fila local de mensagens não publicadas em NVS/flash com limite e desgaste
   controlado; hoje falhas de publicação são observadas, não persistidas.
 - Watchdog de tarefas e contadores de reset/brownout.
-- OTA assinada, partição de rollback e versionamento de configuração.
-- Provisionamento de identidade por dispositivo e mTLS.
+- Partições OTA/rollback já existem; faltam download, assinatura, confirmação
+  de boot e rollback automático exercitados.
+- mTLS direto já compila em `esp32-aws`; falta validar com certificado real e
+  medir pico de heap do handshake.
+- Provisionamento de identidade por dispositivo/frota sem claim permanente.
 - Persistência opcional do estado do algoritmo VOC, conforme suporte oficial.
-- Telemetria de diagnóstico: tensão de alimentação, heap, uptime e códigos de erro.
+- Telemetria de heap, uptime e reset já existe; acrescentar tensão de alimentação
+  e contador de falhas/reconexões.
 
-## 5. Critérios de release
+Gates detalhados: [`MEMORIA_ESP32_WROOM32.md`](MEMORIA_ESP32_WROOM32.md).
 
-- [ ] Ambos os ambientes compilam sem warning novo relevante.
+## 5. Gate AWS
+
+- Thing Name, `DEVICE_ID` e MQTT client ID idênticos.
+- Atributo `siteId` igual ao `SITE_ID` e política sem wildcard de dispositivo.
+- Endpoint ATS/porta 8883, CA, certificado e chave exclusivos.
+- Publicação QoS 1, LWT/status e reconexão vistos no cliente de teste.
+- Heap mínimo/maior bloco medidos antes/depois do handshake e após 24 h.
+- Revogação do certificado impede reconexão; DLQ/alarme recebem falha induzida.
+- Nenhum PEM, endpoint privado ou identificador de conta aparece no Git/log.
+
+## 6. Critérios de release
+
+- [ ] Os três ambientes compilam sem warning novo relevante.
 - [ ] Teste HIL com quatro cenários e timeout aprovado.
 - [ ] 24 h de execução física sem reset inesperado.
 - [ ] Perda/reordenação explicadas em teste de Wi-Fi/broker.

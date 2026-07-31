@@ -6,7 +6,8 @@
 - Tópico: `qualidade-ar/{site_id}/{device_id}/telemetria`.
 - O backend rejeita mensagem cujo tópico não coincida com os IDs do payload.
 - Status retido: `qualidade-ar/{site_id}/{device_id}/status` (`online/offline`).
-- Payload em UTF-8 JSON, máximo operacional recomendado de 8 KiB no broker.
+- Payload em UTF-8 JSON. O broker/backend aceitam até 8 KiB; o firmware desta
+  revisão impõe 896 bytes para preservar heap durante TLS no ESP32.
 
 ## Campos
 
@@ -19,7 +20,11 @@
 | `sequence` | inteiro | não negativo; cresce dentro de um `boot_id` |
 | `measurements` | objeto | campos da versão, número finito ou `null` |
 | `quality` | objeto | `gas_status` e `sensor_status` |
-| `metadata` | objeto | firmware, RSSI, `boot_id`, modo e extensões |
+| `metadata` | objeto | firmware, placa/revisão, RSSI, `boot_id`, modo, heap e extensões |
+
+No ESP32, `metadata` inclui `board_model`, `hardware_revision`, `free_heap_bytes`,
+`min_free_heap_bytes`, `max_alloc_heap_bytes`, `uptime_s` e `reset_reason`.
+Consumidores devem tolerar extensões desconhecidas.
 
 ## Medições v1.1
 

@@ -1,4 +1,4 @@
-# Firmware ESP32
+# Firmware ESP-WROOM-32 DevKit 30P USB-C
 
 Firmware com HAL/Strategy para alternar entre HIL serial e sensores físicos sem
 alterar a lógica de telemetria.
@@ -8,14 +8,17 @@ alterar a lógica de telemetria.
 ```bash
 pio run -e esp32-hil
 pio run -e esp32-fisico
+pio run -e esp32-aws
 ```
 
-Ambos foram compilados na auditoria de 31/07/2026:
+Os três ambientes foram compilados na auditoria de 31/07/2026. A coluna flash
+usa cada slot OTA de 1.572.864 bytes, não os 4 MB inteiros:
 
 | Ambiente | RAM | Flash |
 |---|---:|---:|
-| `esp32-hil` | 46.984 B (14,3%) | 785.569 B (59,9%) |
-| `esp32-fisico` | 47.076 B (14,4%) | 816.437 B (62,3%) |
+| `esp32-hil` | 47.888 B (14,6%) | 787.625 B (50,1%) |
+| `esp32-fisico` | 47.996 B (14,6%) | 818.353 B (52,0%) |
+| `esp32-aws` | 49.024 B (15,0%) | 953.429 B (60,6%) |
 
 Compilado não significa validado eletricamente. O ambiente físico requer o
 bring-up de [`../docs/ROADMAP_FIRMWARE.md`](../docs/ROADMAP_FIRMWARE.md).
@@ -26,8 +29,24 @@ bring-up de [`../docs/ROADMAP_FIRMWARE.md`](../docs/ROADMAP_FIRMWARE.md).
 Copy-Item include\secrets.example.h include\secrets.h
 ```
 
-Edite `secrets.h`. Ele é ignorado pelo Git. Para TLS, use a porta 8883, defina
-`MQTT_TLS` em `src/config.h` e forneça a CA do broker em `MQTT_CA_CERT`.
+Edite `secrets.h`. Ele é ignorado pelo Git. Para TLS local, use a porta 8883,
+ative `MQTT_TLS` e forneça a CA. Para AWS, configure endpoint ATS, porta 8883,
+CA, certificado e chave exclusivos; o ambiente já ativa TLS+mTLS.
+
+## Placa e pinos
+
+O alvo é o clone DevKit 30P/USB-C com módulo Wi-Fi ESP-WROOM-32. O perfil
+PlatformIO `esp32doit-devkit-v1` é compatível com a pinagem GPIO, mas o
+footprint físico precisa ser medido.
+
+| Barramento | Pino da placa | GPIO |
+|---|---|---:|
+| I²C SDA/SCL | D21/D22 | 21/22 |
+| PMS7003 RX/TX do ESP | D16/D17 | 16/17 |
+| ADC MiCS | D34 | 34/ADC1_CH6 |
+| HIL/log/upload | RX0/TX0 | 3/1 |
+
+Detalhes e a ambiguidade `VIN`/`VN`: [`../docs/PINOUT_ESP32_WROOM32_30P.md`](../docs/PINOUT_ESP32_WROOM32_30P.md).
 
 ## HIL
 
@@ -59,6 +78,32 @@ mantém `sensor_status=DEGRADED`, sem fabricar uma precisão inexistente.
 - NTP obrigatório: sem hora válida o firmware não publica data 1970.
 - Last Will retido em `.../status` e reconexão com intervalo.
 - Credenciais fora do código versionado.
+- Buffer MQTT/payload limitado a 896 bytes e recusa de publicação com heap
+  abaixo do mínimo configurado.
+- Metadados de heap livre/mínimo/maior bloco, uptime e motivo de reset.
+- Tópicos e ULIDs em buffers fixos para reduzir fragmentação.
+
+## Flash, OTA e memória
+
+`partitions_4mb_ota.csv` reserva dois slots de 1,5 MiB e 960 KiB de LittleFS.
+Isso prepara rollback OTA, mas não implementa ainda download/verificação da
+imagem. Confirme os 4 MB reais com `esptool.py flash_id` antes de gravar.
+
+Orçamento e gates: [`../docs/MEMORIA_ESP32_WROOM32.md`](../docs/MEMORIA_ESP32_WROOM32.md).
+
+## AWS IoT Core
+
+O ambiente `esp32-aws` usa sensores físicos, Wi-FiClientSecure e certificado de
+cliente. Requisitos de runtime:
+
+- `MQTT_HOST`: endpoint ATS da conta;
+- `MQTT_PORT=8883`;
+- `DEVICE_ID` = Thing Name = MQTT client ID;
+- atributo do Thing `siteId` = `SITE_ID`;
+- política mínima em [`../infra/aws/iot-policy-device.example.json`](../infra/aws/iot-policy-device.example.json).
+
+Com certificados vazios ou porta incorreta, o firmware recusa conexão em vez de
+usar TLS inseguro.
 
 ## Estrutura
 
@@ -76,6 +121,6 @@ src/net/publicador_mqtt.{h,cpp}
 
 ## Próximas evoluções
 
-Persistência limitada de mensagens, watchdog/diagnóstico, OTA assinada com
-rollback, mTLS por dispositivo e calibração/compensação registradas. Critérios
-de release no roadmap de firmware.
+Persistência limitada de mensagens, watchdog, cliente OTA assinado/rollback,
+secure boot/flash encryption quando aplicável, provisionamento de frota e
+calibração registrada. Critérios no roadmap de firmware.

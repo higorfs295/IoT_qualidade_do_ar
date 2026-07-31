@@ -128,8 +128,9 @@ sem correr risco.
 
 - **Testado de verdade:** simulamos **milhares** de aparelhos ao mesmo tempo e
   medimos — sem perder mensagens, com baixa demora. Não é só teoria.
-- **Cresce sem quebrar:** a arquitetura foi pensada para ir de 1 aparelho a
-  100.000, usando os mesmos princípios de grandes sistemas na nuvem (Amazon AWS).
+- **Cresce por etapas:** a arquitetura separa dispositivo, broker, ingestão e
+  armazenamento; há um sandbox AWS reproduzível, mas a escala real precisa ser
+  comprovada por testes e orçamento.
 - **Seguro:** comunicação pode ser **criptografada**, cada aparelho tem sua
   identidade, e nada de senha no lugar errado.
 - **Honesto:** o que ainda não foi montado fisicamente está claramente marcado
@@ -150,7 +151,7 @@ sem correr risco.
 - Montar o aparelho físico (placa + caixa + sensores reais).
 - Ligar os painéis (site e app de celular) para qualquer pessoa acompanhar.
 - Ligar avisos automáticos (ex.: mensagem no celular quando o ar ficar ruim).
-- Levar tudo para a nuvem (AWS), para funcionar em escala.
+- Validar no sandbox AWS o caminho IoT Core → SQS/DLQ → S3/DynamoDB.
 
 ---
 

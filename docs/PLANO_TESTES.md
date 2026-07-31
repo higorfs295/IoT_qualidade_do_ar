@@ -6,13 +6,16 @@
 |---|---|---|---|---|
 | SW-01 | Python | `unittest discover` | log | todos passam |
 | SW-02 | Node | `npm test` | log | todos passam |
-| FW-01 | firmware | build HIL/físico | resumo PIO | ambos success |
+| FW-01 | firmware | build HIL/físico/AWS | resumo PIO | os três success; flash < 80% |
+| FW-02 | memória | TLS + publicação/soak | heap mínimo/reset | heap >= 30 kB; sem reset |
 | HIL-01 | serial | 4 cenários + timeout | payload/log | estado correto |
 | NET-01 | MQTT | queda Wi-Fi/broker | sequência/métricas | reconecta; perdas contadas |
 | API-01 | backend | válido, inválido, grande, duplicado | respostas/métricas | códigos corretos |
 | ELE-01 | energia | curto, corrente, ripple, backfeed | fotos/medidas | dentro do orçamento |
 | SEN-01 | sensores | comparação com referência | CSV/gráfico | erro documentado/aprovado |
 | PCB-01 | placa | ERC/DRC + revisão | relatórios | zero erro não justificado |
+| PIN-01 | placa alvo | pinout/flash/straps | fotos + `flash_id` | 30 pinos/4 MB confirmados |
+| AWS-01 | nuvem | mTLS, regra, DLQ, revogação | logs/métricas | menor privilégio e recuperação |
 | MEC-01 | case | interferência/temperatura/fluxo | desenho/ensaio | sem recirculação/viés excessivo |
 | SYS-01 | sistema | soak 24 h e piloto 7 d | relatório | sem falha crítica |
 
@@ -26,7 +29,7 @@ cd dashboard/backend
 npm test
 node --check src/server.js
 cd ../../firmware
-pio run -e esp32-hil -e esp32-fisico
+pio run -e esp32-hil -e esp32-fisico -e esp32-aws
 ```
 
 ## Teste integrado local
@@ -44,8 +47,11 @@ pio run -e esp32-hil -e esp32-fisico
 - Fonte 5 V limitada: 50 mA sem módulos, depois aumento por etapas.
 - Medir 5 V/3,3 V em vazio e carga; registrar ripple no Wi-Fi/PMS.
 - Conectar ESP32 sem sensores, depois um módulo por vez.
-- Testar USB + fonte externa simultaneamente e confirmar ausência de corrente
-  regressando para a porta do computador.
+- Com `JP1` aberto, testar por USB; com `JP1` fechado e USB desconectado, testar
+  a fonte autônoma. Não conectar as duas fontes enquanto a Rev A não tiver
+  circuito de seleção/power-path validado.
+- Confirmar continuidade de D21/D22/D16/D17/D34 até I2C/UART/ADC e ausência de
+  uso dos strapping pins GPIO0/2/5/12/15.
 - Medir tensão máxima do ADC antes de instalar o ESP32.
 
 ## Caracterização ambiental

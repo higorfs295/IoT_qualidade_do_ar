@@ -1,0 +1,165 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Sandbox de ingestao do monitor de qualidade do ar: IoT Rule, SQS/DLQ, S3 e estado atual DynamoDB.",
+  "Parameters": {
+    "EnvironmentName": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedPattern": "^[a-z0-9-]+$"
+    },
+    "RawRetentionDays": {
+      "Type": "Number",
+      "Default": 30,
+      "MinValue": 1,
+      "MaxValue": 3650
+    }
+  },
+  "Resources": {
+    "TelemetryDlq": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "SqsManagedSseEnabled": true,
+        "MessageRetentionPeriod": 1209600,
+        "Tags": [{ "Key": "Project", "Value": "qar" }]
+      }
+    },
+    "TelemetryQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "SqsManagedSseEnabled": true,
+        "VisibilityTimeout": 120,
+        "MessageRetentionPeriod": 345600,
+        "RedrivePolicy": {
+          "deadLetterTargetArn": { "Fn::GetAtt": ["TelemetryDlq", "Arn"] },
+          "maxReceiveCount": 5
+        },
+        "Tags": [{ "Key": "Project", "Value": "qar" }]
+      }
+    },
+    "RawBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [{ "ServerSideEncryptionByDefault": { "SSEAlgorithm": "AES256" } }]
+        },
+        "OwnershipControls": { "Rules": [{ "ObjectOwnership": "BucketOwnerEnforced" }] },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [{
+            "Id": "ExpireRaw",
+            "Status": "Enabled",
+            "ExpirationInDays": { "Ref": "RawRetentionDays" }
+          }]
+        },
+        "Tags": [{ "Key": "Project", "Value": "qar" }]
+      }
+    },
+    "CurrentStateTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "SSESpecification": { "SSEEnabled": true },
+        "AttributeDefinitions": [{ "AttributeName": "device_key", "AttributeType": "S" }],
+        "KeySchema": [{ "AttributeName": "device_key", "KeyType": "HASH" }],
+        "PointInTimeRecoverySpecification": { "PointInTimeRecoveryEnabled": true },
+        "Tags": [{ "Key": "Project", "Value": "qar" }]
+      }
+    },
+    "IoTRuleRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": { "Service": "iot.amazonaws.com" },
+            "Action": "sts:AssumeRole"
+          }]
+        },
+        "Policies": [{
+          "PolicyName": "DeliverTelemetry",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "sqs:SendMessage",
+                "Resource": [
+                  { "Fn::GetAtt": ["TelemetryQueue", "Arn"] },
+                  { "Fn::GetAtt": ["TelemetryDlq", "Arn"] }
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": "s3:PutObject",
+                "Resource": { "Fn::Sub": "${RawBucket.Arn}/raw/*" }
+              }
+            ]
+          }
+        }]
+      }
+    },
+    "TelemetryRule": {
+      "Type": "AWS::IoT::TopicRule",
+      "Properties": {
+        "TopicRulePayload": {
+          "AwsIotSqlVersion": "2016-03-23",
+          "RuleDisabled": false,
+          "Sql": "SELECT *, topic() AS mqtt_topic, timestamp() AS ingested_at FROM 'qualidade-ar/+/+/telemetria'",
+          "Actions": [
+            {
+              "Sqs": {
+                "QueueUrl": { "Ref": "TelemetryQueue" },
+                "RoleArn": { "Fn::GetAtt": ["IoTRuleRole", "Arn"] },
+                "UseBase64": false
+              }
+            },
+            {
+              "S3": {
+                "BucketName": { "Ref": "RawBucket" },
+                "Key": "raw/${topic(2)}/${topic(3)}/${timestamp()}.json",
+                "RoleArn": { "Fn::GetAtt": ["IoTRuleRole", "Arn"] }
+              }
+            }
+          ],
+          "ErrorAction": {
+            "Sqs": {
+              "QueueUrl": { "Ref": "TelemetryDlq" },
+              "RoleArn": { "Fn::GetAtt": ["IoTRuleRole", "Arn"] },
+              "UseBase64": false
+            }
+          }
+        }
+      }
+    },
+    "DlqVisibleAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Ha mensagens de telemetria na DLQ.",
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Dimensions": [{ "Name": "QueueName", "Value": { "Fn::GetAtt": ["TelemetryDlq", "QueueName"] } }],
+        "Statistic": "Maximum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching"
+      }
+    }
+  },
+  "Outputs": {
+    "TelemetryQueueUrl": { "Value": { "Ref": "TelemetryQueue" } },
+    "TelemetryDlqUrl": { "Value": { "Ref": "TelemetryDlq" } },
+    "RawBucketName": { "Value": { "Ref": "RawBucket" } },
+    "CurrentStateTableName": { "Value": { "Ref": "CurrentStateTable" } },
+    "IoTRuleRoleArn": { "Value": { "Fn::GetAtt": ["IoTRuleRole", "Arn"] } }
+  }
+}

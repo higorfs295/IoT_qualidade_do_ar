@@ -1,6 +1,7 @@
 # Roadmap do esquemático e PCB no EasyEDA Pro
 
-Este roteiro produz um shield Rev A para o **ESP32 DevKit V1 de 30 pinos**.
+Este roteiro produz um shield Rev A para o **DevKit USB-C de 30 pinos com
+módulo ESP-WROOM-32** descrito em [`PINOUT_ESP32_WROOM32_30P.md`](PINOUT_ESP32_WROOM32_30P.md).
 Não selecione footprint pela aparência: DevKits, breakouts e cabos vendidos com
 o mesmo nome variam. Meça e confirme os itens físicos antes de liberar Gerber.
 
@@ -13,7 +14,7 @@ e [exportar BOM/Gerber](https://prodocs.easyeda.com/en/schematic/export-order-pa
 ```text
 J_PWR 5 V regulados -> F1 polyfuse -> +5V_SYS -----> PMS7003 / breakout MiCS
                               |       |  |
-                              |       |  +-> D_ESP -> pino 5V do DevKit
+                              |       |  +-> D_ESP -> JP1 -> VIN do DevKit
                               |       +----> U_LDO 3V3 -> sensores I2C
                               +-> TVS + bulk -> GND
 
@@ -26,10 +27,16 @@ MiCS VOUT -> 15k/10k + RC + proteção -> GPIO34 (ADC1)
 ### Por que há uma entrada externa
 
 O modo físico deve usar uma fonte regulada de 5 V/2 A no conector do shield.
-`D_ESP` permite alimentar o DevKit pelo shield e bloqueia o caminho inverso:
-quando só o USB do computador está conectado para HIL, ele não deve energizar
-ventoinha/aquecedor nem receber corrente de volta da fonte externa. Teste essa
-condição com amperímetro antes de conectar um computador.
+`D_ESP` bloqueia o caminho inverso do VIN do DevKit para as cargas, mas **não é
+um power mux**. `JP1` torna a escolha explícita:
+
+- HIL: USB-C ligado, fonte externa desligada, `JP1` aberto;
+- debug físico: USB-C alimenta o ESP32, fonte externa alimenta sensores,
+  terras comuns e `JP1` aberto;
+- autônomo: USB-C desconectado, fonte externa alimenta tudo e `JP1` fechado.
+
+Nunca fechar `JP1` com USB-C energizado. A documentação oficial do DevKit trata
+USB, 5 V e 3V3 como alternativas de alimentação, não fontes simultâneas.
 
 ### Trilhos
 
@@ -43,18 +50,20 @@ condição com amperímetro antes de conectar um computador.
 
 ## 2. Decisões que precisam ser fechadas antes do desenho
 
-1. Medir distância entre fileiras, passo, comprimento e altura dos headers do
+1. Resolver o segundo `VIN` informado: nessa posição ele é VN/GPIO39 provável.
+   Confirmar por serigrafia/continuidade e nunca aplicar 5 V até resolver.
+2. Medir distância entre fileiras, passo, comprimento e altura dos headers do
    DevKit real; fotografar com paquímetro.
-2. Identificar pinout e conector do PMS7003 comprado. “JST-XH” genérico não é
+3. Identificar pinout e conector do PMS7003 comprado. “JST-XH” genérico não é
    uma especificação suficiente.
-3. Identificar se o MiCS-5524 é **sensor cru** ou **breakout condicionado**.
+4. Identificar se o MiCS-5524 é **sensor cru** ou **breakout condicionado**.
    Este shield aceita somente uma saída analógica condicionada 0–5 V. O sensor
    cru exige circuito de aquecimento/medição próprio e outro esquemático.
-4. Confirmar se breakouts I2C já possuem pull-ups; resistores em paralelo podem
+5. Confirmar se breakouts I2C já possuem pull-ups; resistores em paralelo podem
    deixar o barramento forte demais.
-5. Definir dimensões mecânicas, posição da antena e conectores junto do case.
+6. Definir dimensões mecânicas, posição da antena e conectores junto do case.
 
-Sem essas cinco evidências, o resultado é apenas um desenho conceitual.
+Sem essas seis evidências, o resultado é apenas um desenho conceitual.
 
 ## 3. Esquemático — folha 1: alimentação
 
@@ -65,8 +74,10 @@ Sem essas cinco evidências, o resultado é apenas um desenho conceitual.
 - `D_TVS`: TVS compatível com barramento 5 V e energia esperada.
 - `C1`: 1000 µF/10 V low-ESR; `C2`: 10 µF; `C3`: 100 nF.
 - `D_ESP`: Schottky >=1 A entre `+5V_SYS` e `ESP32_5V`.
-- `U2`: LDO 3,3 V >=300 mA (AP2112K-3.3 ou equivalente) com capacitores do
-  datasheet e dissipação verificada.
+- `JP1`: jumper removível entre D_ESP e VIN; deve ficar aberto durante USB.
+- `U2`: LDO 3,3 V >=600 mA (AP2112K-3.3 ou equivalente) com capacitores do
+  datasheet e dissipação/elevação térmica verificadas. Se aquecer os sensores,
+  migrar para buck de baixo ruído e refazer layout/EMI.
 - LEDs opcionais de 5 V/3,3 V com resistores; acrescente jumpers para isolar
   cada trilho durante o bring-up.
 
@@ -76,7 +87,8 @@ Sem essas cinco evidências, o resultado é apenas um desenho conceitual.
 J1.5V -> F1.1
 F1.2 -> +5V_SYS
 +5V_SYS -> D_TVS.K, C1+, C2+, C3+, D_ESP.A, U2.IN, J_PMS.VCC, J_GAS.VCC
-D_ESP.K -> ESP32_5V
+D_ESP.K -> JP1.1
+JP1.2 -> ESP32_VIN
 U2.OUT -> +3V3_SENS
 J1.GND, D_TVS.A, capacitores-, U2.GND -> GND
 ```
@@ -85,6 +97,13 @@ Coloque test points `TP_5V`, `TP_3V3`, `TP_GND` e um ponto de medição de
 corrente (jumper ou resistor 0 Ω) antes das cargas.
 
 ## 4. Esquemático — folha 2: ESP32 e sensores
+
+### Símbolo do DevKit de 30 pinos
+
+Crie dois conectores 1x15 conforme o CSV físico, com `D21/GPIO21`,
+`D22/GPIO22`, `D16/GPIO16`, `D17/GPIO17` e `D34/GPIO34` explícitos. Marque
+RX0/TX0, strapping pins e entradas-only com notas elétricas. O pad ambíguo só
+recebe o nome VN/GPIO39 depois do gate físico. VP/VN não são alimentação.
 
 ### I2C
 
@@ -136,8 +155,9 @@ inrush do PMS em bancada.
 2. Crie duas páginas: `01_POWER` e `02_ESP_SENSORS`.
 3. Coloque símbolos genéricos de conectores para módulos; símbolos devem mostrar
    os nomes funcionais dos pinos, não esconder o pinout.
-4. Crie um device próprio para o DevKit medido. Numere símbolo e footprint de
-   forma idêntica; marque pinos sem uso com `No Connect`.
+4. Crie um device próprio para o DevKit medido, usando dois headers 1x15.
+   Numere símbolo/footprint de forma idêntica, preserve o lado do USB-C e marque
+   pinos sem uso com `No Connect`.
 5. Preencha em cada componente: designator, valor, fabricante/MPN quando
    definido, footprint e propriedade `DNP` para opcionais.
 6. Use net labels iguais aos nomes acima; evite fios longos cruzando páginas.
@@ -164,7 +184,8 @@ antena ficar fora da placa.
 1. No esquemático: `Design > Schematic to PCB`; aplique todas as mudanças.
 2. Desenhe `Board Outline` somente depois de fechar medidas do DevKit/case.
 3. Camadas: 2 cobre, FR-4 1,6 mm, cobre 1 oz como ponto de partida.
-4. Regras conservadoras para uma fabricação comum:
+4. Importe/replique as classes de [`../hardware/pcb/regras_pcb.csv`](../hardware/pcb/regras_pcb.csv).
+5. Regras conservadoras para uma fabricação comum:
 
 | Regra | Valor inicial |
 |---|---:|
@@ -206,11 +227,14 @@ Confirme os limites no fabricante escolhido; regras de produção podem mudar.
 - [ ] Footprints impressos 1:1 e conferidos com peças reais.
 - [ ] Antena livre e recorte correto.
 - [ ] Nenhuma alimentação pode retornar à USB do computador.
+- [ ] JP1 e os três modos de alimentação estão documentados na serigrafia.
+- [ ] O pino VN/GPIO39 foi confirmado; não existe segundo VIN fictício.
 - [ ] Polaridade de eletrolítico, TVS, diodo, LDO e conectores revisada.
 - [ ] Tensão ADC máxima calculada e medida.
 - [ ] Trilhas de corrente verificadas com corrente/pico medidos.
 - [ ] Revisão independente de esquemático e PCB concluída.
 - [ ] BOM sem `TBD` para os componentes que serão montados.
+- [ ] [`CHECKLIST_REVISAO.md`](../hardware/pcb/CHECKLIST_REVISAO.md) assinado.
 
 ## 11. Exportação e fabricação
 
