@@ -96,6 +96,22 @@ def parse_args(argv):
     p.add_argument("--seed", type=int, default=42)
 
     a = p.parse_args(argv)
+    if a.sensores < 1:
+        p.error("--sensores deve ser >= 1")
+    if a.gateways < 1 or (a.conexoes is not None and a.conexoes < 1):
+        p.error("--gateways/--conexoes deve ser >= 1")
+    if a.processos < 1:
+        p.error("--processos deve ser >= 1")
+    if a.intervalo <= 0:
+        p.error("--intervalo deve ser > 0")
+    if a.duracao < 0:
+        p.error("--duracao deve ser >= 0")
+    if not 0 <= a.prob_degradar <= 1:
+        p.error("--prob-degradar deve estar entre 0 e 1")
+    if a.periodo_reporte <= 0:
+        p.error("--periodo-reporte deve ser > 0")
+    if a.tls_inseguro and not a.tls:
+        p.error("--tls-inseguro exige --tls")
     sensores = a.cenario if a.cenario else a.sensores
     gateways = a.conexoes if a.conexoes is not None else a.gateways
     gateways = max(1, min(gateways, sensores))  # nunca mais gateways que sensores

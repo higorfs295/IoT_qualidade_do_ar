@@ -12,7 +12,8 @@
 //    setup(): Serial + fonte->iniciar() + publicador->iniciar()
 //    loop():  fonte->atualizar(leitura); a cada INTERVALO, publica a telemetria
 //
-//  >>> ESQUELETO — nao compilado aqui. Compile/valide no seu ambiente. <<<
+// Compilado nos ambientes esp32-hil e esp32-fisico; validar eletricamente em
+// bancada antes de interpretar medidas reais.
 // =============================================================================
 #include <Arduino.h>
 #include "config.h"

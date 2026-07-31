@@ -5,6 +5,10 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>   // requer ArduinoJson >= 7 (ver platformio.ini)
 
+static bool numero(JsonVariantConst v) {
+  return v.is<long>() || v.is<unsigned long>() || v.is<double>();
+}
+
 void FonteSimulada::iniciar() {
   _ultima.limpar();
   _len = 0;
@@ -23,30 +27,43 @@ void FonteSimulada::processarLinha(const char* linha) {
 
   Leitura l;
   l.limpar();
-  if (doc["co2_ppm"].is<long>() || doc["co2_ppm"].is<double>()) {
-    l.co2_ppm = doc["co2_ppm"].as<long>(); l.co2_ok = true;
+  if (numero(doc["co2_ppm"])) {
+    l.co2_ppm = doc["co2_ppm"].as<long>();
+    l.co2_ok = l.co2_ppm >= 0 && l.co2_ppm <= 100000;
   }
-  if (doc["voc_index"].is<long>() || doc["voc_index"].is<double>()) {
-    l.voc_index = doc["voc_index"].as<long>(); l.voc_ok = true;
+  if (numero(doc["voc_index"])) {
+    l.voc_index = doc["voc_index"].as<long>();
+    l.voc_ok = l.voc_index >= 0 && l.voc_index <= 500;
   }
-  if (doc["lpg_ppm"].is<long>() || doc["lpg_ppm"].is<double>()) {
-    l.lpg_ppm = doc["lpg_ppm"].as<long>(); l.lpg_ok = true;
+  if (numero(doc["lpg_ppm"])) {
+    l.lpg_ppm = doc["lpg_ppm"].as<long>();
+    l.lpg_ok = l.lpg_ppm >= 0 && l.lpg_ppm <= 1000000;
   }
-  if (doc["pm1_ugm3"].is<double>() || doc["pm1_ugm3"].is<long>()) {
-    l.pm1_ugm3 = doc["pm1_ugm3"].as<float>(); l.pm1_ok = true;
+  if (numero(doc["gas_raw_v"])) {
+    l.gas_raw_v = doc["gas_raw_v"].as<float>();
+    l.gas_raw_ok = isfinite(l.gas_raw_v) && l.gas_raw_v >= 0.0f && l.gas_raw_v <= 5.5f;
   }
-  if (!doc["pm25_ugm3"].isNull() && !doc["pm10_ugm3"].isNull()) {
+  if (numero(doc["pm1_ugm3"])) {
+    l.pm1_ugm3 = doc["pm1_ugm3"].as<float>();
+    l.pm1_ok = isfinite(l.pm1_ugm3) && l.pm1_ugm3 >= 0.0f && l.pm1_ugm3 <= 10000.0f;
+  }
+  if (numero(doc["pm25_ugm3"]) && numero(doc["pm10_ugm3"])) {
     l.pm25_ugm3 = doc["pm25_ugm3"].as<float>();
     l.pm10_ugm3 = doc["pm10_ugm3"].as<float>();
-    l.pm_ok = true;
+    l.pm_ok = isfinite(l.pm25_ugm3) && isfinite(l.pm10_ugm3) &&
+      l.pm25_ugm3 >= 0.0f && l.pm25_ugm3 <= 10000.0f &&
+      l.pm10_ugm3 >= 0.0f && l.pm10_ugm3 <= 10000.0f;
   }
-  if (!doc["temperature_c"].isNull() && !doc["humidity_pct"].isNull()) {
+  if (numero(doc["temperature_c"]) && numero(doc["humidity_pct"])) {
     l.temperature_c = doc["temperature_c"].as<float>();
     l.humidity_pct = doc["humidity_pct"].as<float>();
-    l.th_ok = true;
+    l.th_ok = isfinite(l.temperature_c) && isfinite(l.humidity_pct) &&
+      l.temperature_c >= -50.0f && l.temperature_c <= 100.0f &&
+      l.humidity_pct >= 0.0f && l.humidity_pct <= 100.0f;
   }
   l.sequence = doc["seq"] | 0UL;
-  l.status = STATUS_OK;
+  bool completa = l.co2_ok && l.voc_ok && l.lpg_ok && l.pm1_ok && l.pm_ok && l.th_ok;
+  l.status = completa ? STATUS_OK : STATUS_DEGRADED;
   l.recente = true;
 
   _ultima = l;
@@ -85,7 +102,9 @@ bool FonteSimulada::atualizar(Leitura& out) {
     _ultima.status = STATUS_DEGRADED;
     _ultima.recente = false;
   } else {
-    _ultima.status = STATUS_OK;
+    const bool completa = _ultima.co2_ok && _ultima.voc_ok && _ultima.lpg_ok &&
+      _ultima.pm1_ok && _ultima.pm_ok && _ultima.th_ok;
+    _ultima.status = completa ? STATUS_OK : STATUS_DEGRADED;
     _ultima.recente = true;
   }
   out = _ultima;

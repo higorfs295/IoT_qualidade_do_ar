@@ -1,60 +1,63 @@
-# Backend — Ingestão + API (Fase 2, scaffold)
+# Backend — Ingestão + API (MVP funcional)
 
-Serviço que faz, em produção, o que o `sink` da PoC faz em teste: **assina o
-broker, valida o contrato v1.1, persiste série temporal e serve os dashboards**.
+Serviço MVP que faz o papel local do `sink`: **assina o broker, valida o
+contrato v1.1, mantém uma série curta em memória e serve o dashboard**.
 
-## Stack (espelha o backend do Painel_UFG)
+## Stack atual
 
-- **Fastify** (Node/TypeScript) — API HTTP performática, com plugins.
-- **Prisma** — ORM e migrações.
-- **Banco de série temporal** — começar com **SQLite** (protótipo de 1
-  dispositivo) e evoluir para **PostgreSQL + TimescaleDB** (hypertables) quando
-  crescer.
-- **MQTT** — `mqtt.js` assinando `qualidade-ar/#`.
-- **WebSocket/SSE** — empurra telemetria em tempo real ao front.
-- Plugins de **métricas** (`/metrics` estilo Prometheus — herdado do simulador
-  do IoT-IDEA), **segurança** e **observabilidade** (padrão do Painel_UFG).
+- **Node.js HTTP** — servidor enxuto sem framework.
+- **Armazenamento em memória** — estado e ring buffer; reinício apaga dados.
+- **MQTT** — `mqtt.js` assinando apenas `qualidade-ar/+/+/telemetria`.
+- **WebSocket** — empurra telemetria em tempo real ao front.
+
+Fastify/TypeScript/PostgreSQL são a evolução B1, não o estado atual. Veja
+[`../../docs/ROADMAP_SOFTWARE.md`](../../docs/ROADMAP_SOFTWARE.md).
 
 ## Responsabilidades
 
 1. **Assinar** o broker e receber a telemetria.
 2. **Validar** cada mensagem contra o contrato v1.1 (mesma regra do
-   `poc/qar_poc/contrato.py`); rejeitadas vão para uma tabela de quarentena.
+   `poc/qar_poc/contrato.py`); rejeitadas incrementam métricas. Quarentena
+   persistente é parte do roadmap.
 3. **Deduplicar** por `message_id` e **detectar lacunas** por `sequence`.
-4. **Persistir** a série temporal e manter o **estado atual** por dispositivo.
+4. **Reter em memória** uma série limitada e o **estado atual** por dispositivo.
 5. **Servir** os dashboards.
 
-## API (rascunho)
+## API atual
 
 | Método | Rota | Uso |
 |---|---|---|
-| GET | `/dispositivos` | lista dispositivos e último status |
-| GET | `/dispositivos/:id/atual` | leitura mais recente |
-| GET | `/dispositivos/:id/serie?de=&ate=&campo=` | série histórica (gráficos) |
-| GET | `/alertas` | eventos de limiar (UNSAFE) |
-| GET | `/metricas` | métricas operacionais (Prometheus) |
-| WS | `/stream` | telemetria em tempo real |
+| GET | `/api/dispositivos` | lista dispositivos e último status |
+| GET | `/api/dispositivos/:id/atual` | leitura mais recente |
+| GET | `/api/dispositivos/:id/serie?campo=&n=` | ring buffer de uma grandeza |
+| GET | `/api/metricas` | contadores JSON |
+| POST | `/api/ingest` | ingestão de desenvolvimento |
+| WS | `/ws` | telemetria em tempo real |
 
-## Estrutura sugerida
+Em `NODE_ENV=production`, a ingestão HTTP fica desabilitada por padrão. Use
+`ENABLE_HTTP_INGEST=true` e `HTTP_INGEST_TOKEN` somente quando necessário.
+
+| Variável | Padrão | Limite/uso |
+|---|---:|---|
+| `PORT` | 3001 | porta HTTP válida |
+| `SERIE_MAX` | 500 | pontos por dispositivo |
+| `DEVICES_MAX` | 10.000 | dispositivos mantidos em memória |
+| `IDS_MAX` | 200.000 | janela de deduplicação |
+| `BODY_MAX` | 65.536 | bytes por ingestão HTTP |
+| `ONLINE_TIMEOUT_MS` | 120.000 | janela de presença |
+
+## Estrutura atual
 
 ```text
-backend/
-├── src/
-│   ├── server.ts           # bootstrap Fastify + plugins
-│   ├── mqtt/ingestor.ts     # assina o broker, valida, persiste
-│   ├── contrato.ts          # espelho do contrato v1.1 (validação)
-│   ├── db/                   # Prisma schema + repositórios
-│   ├── rotas/               # dispositivos, série, alertas, métricas
-│   └── ws/stream.ts          # WebSocket de tempo real
-├── prisma/schema.prisma
-├── Dockerfile
-└── package.json
+backend/src/server.js
+backend/src/contrato.js
+backend/test/contrato.test.js
 ```
 
 ## Princípios (redes / distribuídos)
 
 - **Idempotência** por `message_id`; **detecção de perda** por `sequence`.
-- **Retenção**: bruto por N dias, agregados por hora com TTL (alinhado à política
-  do Wilson em `docs/modelagem_dados.json`).
+- **Retenção atual:** somente memória. A política proposta está em
+  `docs/modelagem_dados.json`.
 - **Desacoplamento**: o broker separa dispositivos de consumidores; a ingestão
   escala independente.

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ufg:qar:telemetria:1.1",
+  "title": "Telemetria da estação de qualidade do ar",
+  "type": "object",
+  "required": ["schema_version", "message_id", "device_id", "site_id", "sent_at", "sequence", "measurements"],
+  "properties": {
+    "schema_version": { "enum": ["1.0", "1.1"] },
+    "message_id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" },
+    "device_id": { "$ref": "#/$defs/id" },
+    "site_id": { "$ref": "#/$defs/id" },
+    "sent_at": { "type": "string", "format": "date-time" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "measurements": { "type": "object" },
+    "quality": {
+      "type": "object",
+      "properties": {
+        "gas_status": { "enum": ["SAFE", "UNSAFE", "UNKNOWN"] },
+        "sensor_status": { "enum": ["OK", "DEGRADED", "ERROR"] }
+      },
+      "additionalProperties": true
+    },
+    "metadata": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "schema_version": { "const": "1.0" } } },
+      "then": {
+        "properties": {
+          "measurements": {
+            "required": ["co2_ppm", "tvoc_ppb", "pm1_ugm3", "pm25_ugm3", "pm10_ugm3", "temperature_c", "humidity_pct"],
+            "properties": {
+              "co2_ppm": { "$ref": "#/$defs/co2" },
+              "tvoc_ppb": { "$ref": "#/$defs/tvoc" },
+              "pm1_ugm3": { "$ref": "#/$defs/pm" },
+              "pm25_ugm3": { "$ref": "#/$defs/pm" },
+              "pm10_ugm3": { "$ref": "#/$defs/pm" },
+              "temperature_c": { "$ref": "#/$defs/temperature" },
+              "humidity_pct": { "$ref": "#/$defs/humidity" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "schema_version": { "const": "1.1" } } },
+      "then": {
+        "properties": {
+          "measurements": {
+            "required": ["co2_ppm", "voc_index", "lpg_ppm", "pm1_ugm3", "pm25_ugm3", "pm10_ugm3", "temperature_c", "humidity_pct"],
+            "properties": {
+              "co2_ppm": { "$ref": "#/$defs/co2" },
+              "voc_index": { "$ref": "#/$defs/vocIndex" },
+              "lpg_ppm": { "$ref": "#/$defs/lpg" },
+              "gas_raw_v": { "$ref": "#/$defs/gasRaw" },
+              "pm1_ugm3": { "$ref": "#/$defs/pm" },
+              "pm25_ugm3": { "$ref": "#/$defs/pm" },
+              "pm10_ugm3": { "$ref": "#/$defs/pm" },
+              "temperature_c": { "$ref": "#/$defs/temperature" },
+              "humidity_pct": { "$ref": "#/$defs/humidity" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$" },
+    "co2": { "type": ["number", "null"], "minimum": 0, "maximum": 100000 },
+    "tvoc": { "type": ["number", "null"], "minimum": 0, "maximum": 10000000 },
+    "vocIndex": { "type": ["number", "null"], "minimum": 0, "maximum": 500 },
+    "lpg": { "type": ["number", "null"], "minimum": 0, "maximum": 1000000 },
+    "gasRaw": { "type": ["number", "null"], "minimum": 0, "maximum": 5.5 },
+    "pm": { "type": ["number", "null"], "minimum": 0, "maximum": 10000 },
+    "temperature": { "type": ["number", "null"], "minimum": -50, "maximum": 100 },
+    "humidity": { "type": ["number", "null"], "minimum": 0, "maximum": 100 }
+  },
+  "additionalProperties": true
+}

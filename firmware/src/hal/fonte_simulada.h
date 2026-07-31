@@ -7,6 +7,7 @@
 //  quadros param de chegar, a leitura vira DEGRADED e depois ERROR.
 // =============================================================================
 #pragma once
+#include <cstddef>
 #include "fonte_sensores.h"
 #include "../config.h"
 

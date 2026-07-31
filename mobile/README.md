@@ -1,10 +1,12 @@
-# Mobile — App Flutter (Fase 3, scaffold)
+# Mobile — App Flutter (planejado)
 
 Aplicativo mobile em **Flutter**, consumindo a **mesma API + WebSocket** do
 [`../dashboard/backend`](../dashboard/backend) — paridade total com o web.
 
 > Status nesta branch: **scaffold documentado**. Implementação na Fase 3 do
 > roadmap em [`../BASE_FINAL.md`](../BASE_FINAL.md).
+
+Plano executável e gates: [`../docs/ROADMAP_SOFTWARE.md`](../docs/ROADMAP_SOFTWARE.md).
 
 ## Por que Flutter
 

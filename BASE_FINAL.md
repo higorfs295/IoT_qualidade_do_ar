@@ -1,5 +1,10 @@
 # BASE_FINAL — Estação de Monitoramento de Qualidade do Ar (projeto real)
 
+> **Nota de revisão (31/07/2026):** este arquivo preserva o blueprint original.
+> O estado auditado, correções e gates atuais estão no [`README.md`](README.md)
+> e em [`docs/STATUS_PROJETO.md`](docs/STATUS_PROJETO.md). Em caso de divergência,
+> esses documentos mais recentes prevalecem.
+
 > Blueprint mestre da evolução do projeto acadêmico para um **produto real**:
 > um protótipo físico (ESP32 + shield PCB + case) com **sensores emulados por
 > software** durante o desenvolvimento (Hardware-in-the-Loop), ecossistema
@@ -127,9 +132,10 @@ falhas, coerente com a Atividade 1 que já usava SCD41):
   ventoinha + o pico de ~205 mA do SCD41 na medição estouram 500 mA. Some um
   **capacitor bulk de 470–1000 µF** no 5 V para evitar brownout/reset.
 - **Redutor de tensão (obrigatório):** o VOUT analógico do MiCS-5524 pode chegar
-  perto de 5 V e queimaria o GPIO34 (máx. 3.3 V). Um **divisor ÷2 (2×10 kΩ) + RC**
-  leva o sinal a 0–2.5 V, dentro da faixa linear do ADC. O firmware multiplica
-  por `MICS_DIVISOR` para recuperar a tensão real.
+  perto de 5 V e queimaria o GPIO34 (máx. 3.3 V). A revisão atual usa
+  **15 kΩ/10 kΩ (ganho 0,4) + RC**. O firmware multiplica a leitura por
+  `MICS_DIVISOR=2.5` para estimar a tensão antes do divisor; ppm permanece nulo
+  até existir calibração rastreável do conjunto real.
 - Nenhum outro nível precisa de conversão: I2C e a UART do PMS7003 já são 3.3 V.
 
 ---
@@ -161,7 +167,8 @@ mudanças refletem os módulos escolhidos:
 | `pm1_ugm3`, `pm25_ugm3`, `pm10_ugm3` | ✔ | ✔ | PMS7003 |
 | `tvoc_ppb` | ✔ | opcional (legado) | — |
 | `voc_index` | — | **✔ (novo)** | SGP40 (índice 1–500) |
-| `lpg_ppm` | — | **✔ (novo)** | MiCS-5524 |
+| `gas_raw_v` | — | **✔ (diagnóstico)** | MiCS-5524 via divisor ADC |
+| `lpg_ppm` | — | condicional | somente após calibração rastreável |
 
 O `schema_version` passa a aceitar **"1.0"** e **"1.1"**. Mensagens v1.0
 continuam válidas; v1.1 exige os novos campos. O validador em

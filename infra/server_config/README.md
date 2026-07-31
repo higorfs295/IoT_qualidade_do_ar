@@ -66,7 +66,7 @@ consumo de recursos da máquina durante os experimentos de desempenho.
 | `sink` | build de `../../poc` | — | validador **sempre ativo** (assina e mede) | núcleo |
 | `gerador` | build de `../../poc` | — | teste de carga **sob demanda** | `carga` |
 | `postgres` | `postgres:16-alpine` | — | banco do ThingsBoard | `plataforma` |
-| `thingsboard` | `thingsboard/tb-node:3.8.1CE` | 8080, 1884, 7070 | plataforma IoT (UI, alertas) | `plataforma` |
+| `thingsboard` | `thingsboard/tb-node:3.9.0` | 8080, 1884, 7070 | plataforma IoT (UI, alertas) | `plataforma` |
 
 - Broker MQTT do projeto: **`localhost:1883`**.
 - O **sink** é núcleo: subir o ambiente já o deixa validando a ingestão e

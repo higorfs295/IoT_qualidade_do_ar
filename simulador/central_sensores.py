@@ -20,7 +20,7 @@ FONTE_FISICA e este script deixa de ser necessario, sem mudar mais nada.
 -----------------------------------------------------------------------------
    SCD41     -> co2_ppm            (NDIR)
    SGP40     -> voc_index          (indice VOC 1-500, ~100 em ar limpo)
-   MiCS-5524 -> lpg_ppm            (GLP/combustiveis)
+   MiCS-5524 -> lpg_ppm            (somente cenário sintético de integração)
    PMS7003   -> pm1/pm25/pm10_ugm3 (particulados)
    SHT31     -> temperature_c, humidity_pct
 
@@ -30,7 +30,7 @@ FONTE_FISICA e este script deixa de ser necessario, sem mudar mais nada.
    normal          operacao tipica de ambiente fechado
    pico_poluicao   particulado alto (transito, obra, fumaca externa)
    incendio        CO2 e particulado muito altos, VOC alto, temperatura sobe
-   vazamento_glp   pico de GLP (lpg_ppm) — o cenario critico do MiCS-5524
+   vazamento_glp   valor sintético alto em lpg_ppm; não é curva do MiCS-5524
    auto            majoritariamente normal, injetando eventos aleatorios
 
 -----------------------------------------------------------------------------
@@ -217,7 +217,16 @@ def main(argv=None) -> int:
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--self-test", action="store_true",
                    help="Confere a geracao e sai.")
+    p.add_argument("--silenciar-logs", action="store_true",
+                   help="Drena, mas nao mostra, os logs recebidos do ESP32.")
     a = p.parse_args(argv if argv is not None else sys.argv[1:])
+
+    if a.intervalo <= 0:
+        p.error("--intervalo deve ser > 0")
+    if a.duracao < 0:
+        p.error("--duracao deve ser >= 0")
+    if not 300 <= a.baud <= 4_000_000:
+        p.error("--baud fora da faixa suportada")
 
     if a.self_test:
         return self_test()
@@ -242,6 +251,12 @@ def main(argv=None) -> int:
     enviados = 0
     try:
         while not parar["v"]:
+            # A UART USB e bidirecional: alem de escrever os quadros HIL, drene
+            # os logs do firmware para o buffer do adaptador nao encher.
+            if ser is not None and ser.in_waiting:
+                logs = ser.read(ser.in_waiting).decode("utf-8", errors="replace")
+                if logs and not a.silenciar_logs:
+                    print(logs, end="", file=sys.stderr, flush=True)
             quadro = central.proximo_quadro(a.cenario)
             linha = serializar(quadro)
             if ser is not None:

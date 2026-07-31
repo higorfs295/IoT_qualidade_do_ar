@@ -3,14 +3,8 @@
 //  Projeto: Monitoramento de Qualidade do Ar
 // =============================================================================
 //
-//  ESTE E O UNICO LUGAR que muda para alternar entre o modo SIMULADO (HIL, via
-//  central_sensores.py pela USB) e o modo FISICO (sensores reais). Nenhuma
-//  outra parte do codigo sabe qual fonte esta ativa — esse e o objetivo da HAL.
-//
-//  >>> CAUTELA: este firmware e um ESQUELETO cuidadosamente estruturado (pinos,
-//      enderecos I2C e uso de bibliotecas corretos), porem NAO foi compilado
-//      nem flashado aqui. Compile e valide no SEU ambiente (PlatformIO/Arduino),
-//      ajustando bibliotecas e calibracao. Mesma convencao dos seus firmwares.
+// O ambiente do PlatformIO seleciona HIL ou sensores fisicos. Credenciais
+// ficam em include/secrets.h, nunca neste arquivo versionado.
 // =============================================================================
 #pragma once
 
@@ -21,7 +15,13 @@
 #define FONTE_FISICA   1   // le os sensores reais (I2C/UART/ADC)
 
 #ifndef MODO_SENSOR
-#define MODO_SENSOR FONTE_SIMULADA   // <-- mude para FONTE_FISICA no protótipo real
+#define MODO_SENSOR FONTE_SIMULADA
+#endif
+
+#if __has_include("secrets.h")
+#include "secrets.h"
+#else
+#include "secrets.example.h"
 #endif
 
 // -----------------------------------------------------------------------------
@@ -32,20 +32,11 @@
 #define FIRMWARE_VERSION "1.1.0"
 
 // -----------------------------------------------------------------------------
-// Wi-Fi
-// -----------------------------------------------------------------------------
-#define WIFI_SSID  "<SSID_DA_REDE>"
-#define WIFI_PASS  "<SENHA_DO_WIFI>"
-
-// -----------------------------------------------------------------------------
 // MQTT (broker Mosquitto local; futuramente AWS IoT Core)
 // -----------------------------------------------------------------------------
-#define MQTT_HOST       "192.168.0.10"   // IP do broker na sua rede
-#define MQTT_PORT       1883             // 1883 texto (PoC) / 8883 TLS (producao)
-#define MQTT_USER       ""               // vazio = anonimo (PoC em rede isolada)
-#define MQTT_PASS       ""
 #define MQTT_KEEPALIVE  60
-#define MQTT_QOS        1                // contrato: QoS 1
+#define MQTT_QOS        1
+#define MQTT_RECONNECT_MS 5000UL
 // #define MQTT_TLS                       // descomente p/ TLS 8883 (carregar CA)
 
 // -----------------------------------------------------------------------------
@@ -71,11 +62,15 @@
 #define PMS_UART_RX   16   // ESP32 RX  <- PMS7003 TX
 #define PMS_UART_TX   17   // ESP32 TX  -> PMS7003 RX
 #define MICS_ADC_PIN  34   // MiCS-5524 VOUT (GPIO34 = ADC1, so entrada)
-// O VOUT do MiCS (alimentado em 5 V) passa por um DIVISOR ÷2 (2x10k) antes do
-// GPIO34, para nunca exceder 3.3 V. Multiplique a leitura por este fator para
-// recuperar a tensao real. Ver hardware/pcb/README.md §2.3.
-#define MICS_DIVISOR  2.0f
-#define ADC_VREF      3.3f   // tensao de referencia efetiva do ADC (aprox.)
+// A entrada analogica passa pelo divisor 15k/10k da Rev A (ganho 0,4).
+// Multiplique a tensao no ADC por 2,5 para estimar a tensao antes do divisor.
+#define MICS_DIVISOR  2.5f
+#define MICS_AMOSTRAS_ADC 32
+
+// O MiCS-5524 nao fornece ppm diretamente. Sem uma curva obtida para o modulo,
+// carga e gas-alvo usados, o firmware publica apenas gas_raw_v e mantem
+// lpg_ppm=null. Veja docs/ROADMAP_HARDWARE_EASYEDA.md.
+#define MICS_LPG_CALIBRADO 0
 
 // -----------------------------------------------------------------------------
 // Limiares de qualidade do ar (derivam o gas_status; ver contrato)

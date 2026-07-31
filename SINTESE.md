@@ -1,5 +1,9 @@
 # Síntese do Projeto — em linguagem simples
 
+> **Importante:** é um protótipo educacional, não um alarme certificado. Ele
+> ajuda a observar tendências ambientais, mas não deve ser usado como única
+> base para decisões de emergência ou para declarar um ambiente seguro.
+
 > Uma explicação do projeto **inteiro** para qualquer pessoa, sem jargão, com
 > analogias do dia a dia. Se você quer entender "o que é isso e como funciona"
 > em 10 minutos, comece por aqui. Os detalhes técnicos estão no
@@ -10,14 +14,13 @@
 ## 1. Qual problema resolvemos?
 
 Imagine uma sala fechada — uma sala de aula, um escritório, um quarto. Você não
-enxerga, mas o ar ali pode estar ruim: gás carbônico acumulado (que dá sono e
-dor de cabeça), poeira fina, cheiro de produto de limpeza, ou até um vazamento
-de gás de cozinha. O problema é que **os nossos sentidos falham**: a gente se
+enxerga, mas o ar ali pode estar ruim: gás carbônico acumulado, poeira fina ou
+compostos voláteis. O problema é que **os nossos sentidos falham**: a gente se
 acostuma com o ar viciado e não percebe o perigo.
 
 Nosso projeto é como instalar um **"nariz eletrônico" que nunca dorme**. Ele
 mede o ar o tempo todo e avisa, em linguagem simples, quando está na hora de
-**abrir a janela** — ou quando há algo perigoso, como um vazamento.
+investigar a ventilação e possíveis fontes de poluição.
 
 ---
 

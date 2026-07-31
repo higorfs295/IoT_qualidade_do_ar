@@ -18,6 +18,7 @@ struct Leitura {
   int32_t co2_ppm;      bool co2_ok;      // SCD41
   int32_t voc_index;    bool voc_ok;      // SGP40 (indice 1-500)
   int32_t lpg_ppm;      bool lpg_ok;      // MiCS-5524
+  float gas_raw_v;      bool gas_raw_ok;  // entrada analogica, antes da calibracao
 
   // Particulados (float)
   float pm1_ugm3;       bool pm1_ok;      // PMS7003
@@ -31,10 +32,11 @@ struct Leitura {
   bool recente;         // houve leitura dentro do timeout?
 
   void limpar() {
-    co2_ok = voc_ok = lpg_ok = pm1_ok = pm_ok = th_ok = false;
+    co2_ok = voc_ok = lpg_ok = gas_raw_ok = pm1_ok = pm_ok = th_ok = false;
     co2_ppm = voc_index = lpg_ppm = 0;
     pm1_ugm3 = pm25_ugm3 = pm10_ugm3 = 0.0f;
     temperature_c = humidity_pct = 0.0f;
+    gas_raw_v = 0.0f;
     sequence = 0;
     status = STATUS_ERROR;
     recente = false;

@@ -4,11 +4,10 @@ O ecossistema de visualização da estação: um **serviço de ingestão** que a
 o broker MQTT, valida o contrato v1.1, guarda série temporal e expõe uma API
 REST + WebSocket; e um **dashboard web** legível por um **usuário leigo**.
 
-> Status nesta branch: **MVP funcional** (Fase 2). O backend Node e o dashboard
-> web já rodam e foram validados de ponta a ponta (broker → gerador → backend →
-> WebSocket → painel), com verdito por cor, cartões por grandeza e detecção de
-> perdas. A evolução para o padrão de produção (Fastify + Prisma + Next.js, como
-> o Painel_UFG) está descrita nos READMEs de cada parte.
+> Status: **MVP funcional**. Nesta revisão foram verificados ingestão HTTP,
+> métricas, listagem, arquivos estáticos, cabeçalhos de segurança e testes do
+> contrato. A integração MQTT histórica deve ser reproduzida no ambiente-alvo;
+> persistência, autenticação e aplicação Next.js continuam no roadmap.
 
 ```text
 dashboard/
@@ -39,10 +38,9 @@ cd ../../dashboard/backend && npm install && npm start
 ESP32 ─MQTT─▶ Broker ─▶ [backend: assina, valida, persiste] ─REST/WebSocket─▶ [web] e [mobile]
 ```
 
-- **backend** e **web** seguem a arquitetura do **Painel_UFG** (o seu projeto de
-  referência): Fastify + Prisma + PostgreSQL no backend; Next.js + Tailwind +
-  TanStack Query no front. Reaproveitam plugins de métricas/segurança, Docker,
-  testes e a organização de `docs/`.
+- **backend** e **web** são implementações deliberadamente pequenas em Node e
+  JavaScript puro. Fastify/Prisma/PostgreSQL e Next.js são a evolução planejada,
+  detalhada em [`../docs/ROADMAP_SOFTWARE.md`](../docs/ROADMAP_SOFTWARE.md).
 - Para gráficos imediatos e sem build, o front pode começar com o `charts.js`
   (SVG puro, sem dependências) do **IoT-IDEA**, evoluindo para componentes React.
 - A **legibilidade para leigos** é requisito de projeto: ver `web/README.md`.

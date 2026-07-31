@@ -51,6 +51,14 @@ def parse_args(argv):
                    help="Duracao em segundos (0 = continuo).")
     p.add_argument("--periodo-reporte", type=float, default=2.0)
     a = p.parse_args(argv)
+    if not 1 <= a.porta <= 65535:
+        p.error("--porta deve estar entre 1 e 65535")
+    if a.duracao < 0:
+        p.error("--duracao deve ser >= 0")
+    if a.periodo_reporte <= 0:
+        p.error("--periodo-reporte deve ser > 0")
+    if a.tls_inseguro and not a.tls:
+        p.error("--tls-inseguro exige --tls")
     return ConfigSink(
         host=a.host, porta=a.porta, topico=a.topico, qos=a.qos,
         usuario=a.usuario, senha=a.senha, tls=a.tls, tls_inseguro=a.tls_inseguro,

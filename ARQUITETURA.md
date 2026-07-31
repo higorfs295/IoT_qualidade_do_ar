@@ -1,5 +1,10 @@
 # Arquitetura da Solução — Monitoramento de Qualidade do Ar (Atividade 3)
 
+> **Documento histórico da PoC de ingestão.** Para a arquitetura final auditada,
+> estado atual e roadmaps, comece pelo [`README.md`](README.md) e por
+> [`docs/STATUS_PROJETO.md`](docs/STATUS_PROJETO.md). Resultados de benchmark
+> descritos aqui devem ser reproduzidos antes de citação externa.
+
 > Documento técnico completo da arquitetura de ingestão de dados IoT.
 > Explica, de forma simples e coesa, **todo** o código, todas as pastas, e
 > **cada função e método** da prova de conceito (PoC) e da infraestrutura.
@@ -566,7 +571,7 @@ Sobe o ambiente com **perfis** (para controlar custo/recursos):
 | `sink` | build de `poc/` | validador **sempre ativo** (assina e mede) | núcleo |
 | `gerador` | build de `poc/` | teste de carga **sob demanda** | `carga` |
 | `postgres` | `postgres:16-alpine` | banco do ThingsBoard | `plataforma` |
-| `thingsboard` | `thingsboard/tb-node:3.8.1CE` | dashboards/alertas | `plataforma` |
+| `thingsboard` | `thingsboard/tb-node:3.9.0` | dashboards/alertas | `plataforma` |
 
 Detalhes importantes:
 - O `mosquitto` monta a config como **somente leitura**, tem `ulimits.nofile`

@@ -1,4 +1,25 @@
 {
-  "projeto": "Monitoramento de Qualidade do Ar",
-  "descricao": "Estrutura do payload e armazenamento"
+  "projeto": "Estação IoT de Qualidade do Ar",
+  "contrato_atual": "1.1",
+  "json_schema": "telemetria-v1.1.schema.json",
+  "topico": "qualidade-ar/{site_id}/{device_id}/telemetria",
+  "chaves": {
+    "idempotencia": "message_id",
+    "ordenacao_logica": ["device_id", "boot_id", "sequence"],
+    "serie_temporal": ["site_id", "device_id", "sent_at"]
+  },
+  "camadas_de_dados": {
+    "estado_atual": "última mensagem não reordenada por dispositivo",
+    "historico": "telemetria válida e imutável",
+    "quarentena": "payload/tópico rejeitado com motivo e instante de ingestão",
+    "eventos": "transições de regra com versão, janela, histerese e reconhecimento"
+  },
+  "retencao_proposta": {
+    "estado_atual": "enquanto o dispositivo existir",
+    "historico_bruto": "30 dias no banco operacional; ajustar por custo e finalidade",
+    "agregados_horarios": "13 meses",
+    "quarentena": "7 dias, sem segredos",
+    "auditoria_de_alertas": "conforme política acadêmica/organizacional"
+  },
+  "observacao": "Retenção é uma proposta de engenharia e deve ser aprovada conforme finalidade, custo e governança."
 }

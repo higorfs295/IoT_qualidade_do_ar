@@ -6,7 +6,7 @@ Monitoramento de Qualidade do Ar — UFG, Internet das Coisas.
 
 A PoC e organizada por PAPEIS (entidades), cada um em seu modulo:
 
-    contrato    fonte unica de verdade do schema v1.0 (topico, validacao, ULID)
+    contrato    fonte unica de verdade dos schemas v1.0/v1.1 (topico, validacao, ULID)
     sensor      a "Coisa": modela um dispositivo e gera leituras (Dispositivo)
     transporte  camada de comunicacao MQTT (ClienteMQTT sobre paho-mqtt)
     gateway     concentrador de borda de um site (Gateway); 1 gateway = 1 conexao

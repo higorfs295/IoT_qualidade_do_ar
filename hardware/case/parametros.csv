@@ -1,0 +1,22 @@
+Parametro,Valor_inicial_mm,Valor_medido_mm,Origem/observacao
+WALL,2.0,,Parede FDM
+BASE_FLOOR,2.4,,Piso
+CLEAR_XY,0.5,,Folga por lado
+CLEAR_Z,1.0,,Folga vertical
+LID_GAP,0.30,,Calibrar com cupom
+LIP_H,3.0,,Encaixe tampa
+LIP_T,1.2,,Encaixe tampa
+BOSS_OD,7.0,,Poste M3
+VENT_D,4.0,,Furo passivo
+VENT_PITCH,7.0,,Matriz ventilacao
+DUCT_GAP,0.4,,Folga por lado
+FILLET_EXT,2.0,,Aresta externa
+PCB_X,,,Medir Rev A
+PCB_Y,,,Medir Rev A
+PCB_Z_MAX,,,Maior componente + solda
+PMS_X,,,Medir modulo real
+PMS_Y,,,Medir modulo real
+PMS_Z,,,Medir modulo real
+USB_KEEP_X,,,Conector + carcaca do cabo
+USB_KEEP_Y,,,Conector + carcaca do cabo
+USB_KEEP_Z,,,Conector + raio do cabo

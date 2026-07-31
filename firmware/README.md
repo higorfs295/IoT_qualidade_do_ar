@@ -1,85 +1,81 @@
-# Firmware — Estação de Qualidade do Ar (ESP32)
+# Firmware ESP32
 
-Firmware do protótipo real, com **camada de abstração de hardware (HAL)** e o
-padrão **Strategy** para alternar entre sensores **simulados** (Hardware-in-the-
-Loop, via `central_sensores.py` pela USB) e **físicos** (I2C/UART/ADC) trocando
-**uma única linha** de configuração. Ver o blueprint completo em
-[`../BASE_FINAL.md`](../BASE_FINAL.md).
+Firmware com HAL/Strategy para alternar entre HIL serial e sensores físicos sem
+alterar a lógica de telemetria.
 
-> ⚠️ **Cautela (leia antes de flashar):** este firmware é um **esqueleto
-> cuidadosamente estruturado** — pinos, endereços I2C, uso de bibliotecas e
-> arquitetura estão corretos, **mas ele não foi compilado nem flashado aqui**.
-> Compile e valide no seu ambiente (PlatformIO/Arduino), sensor a sensor. É a
-> mesma convenção do seu firmware do IoT-IDEA.
+## Builds
+
+```bash
+pio run -e esp32-hil
+pio run -e esp32-fisico
+```
+
+Ambos foram compilados na auditoria de 31/07/2026:
+
+| Ambiente | RAM | Flash |
+|---|---:|---:|
+| `esp32-hil` | 46.984 B (14,3%) | 785.569 B (59,9%) |
+| `esp32-fisico` | 47.076 B (14,4%) | 816.437 B (62,3%) |
+
+Compilado não significa validado eletricamente. O ambiente físico requer o
+bring-up de [`../docs/ROADMAP_FIRMWARE.md`](../docs/ROADMAP_FIRMWARE.md).
+
+## Configuração segura
+
+```powershell
+Copy-Item include\secrets.example.h include\secrets.h
+```
+
+Edite `secrets.h`. Ele é ignorado pelo Git. Para TLS, use a porta 8883, defina
+`MQTT_TLS` em `src/config.h` e forneça a CA do broker em `MQTT_CA_CERT`.
+
+## HIL
+
+```bash
+pio run -e esp32-hil -t upload
+python ../simulador/central_sensores.py --porta COM5 --cenario auto
+```
+
+O simulador escreve NDJSON e drena os logs que voltam pela mesma UART. Quadros
+maiores que 511 bytes ou JSON inválido são descartados. O heartbeat classifica
+leituras antigas como degradadas/erro.
+
+## Fonte física
+
+- SHT31: temperatura/umidade em `0x44`.
+- SGP40: sinal bruto compensado por T/RH + algoritmo VOC a 1 Hz.
+- SCD41: modo periódico e leitura somente quando `dataReady`.
+- PMS7003: parser não bloqueante, frame de 32 bytes e checksum.
+- GPIO34: média de 32 leituras em mV, divisor 15k/10k, `gas_raw_v`.
+
+`lpg_ppm` permanece nulo até calibração rastreável do conjunto analógico. Isso
+mantém `sensor_status=DEGRADED`, sem fabricar uma precisão inexistente.
+
+## MQTT e integridade
+
+- Biblioteca MQTT com publicação QoS 1 real.
+- ULID canônico por mensagem e `boot_id` por inicialização.
+- `sequence` MQTT cresce durante o boot; consumidores usam `boot_id` para reset.
+- NTP obrigatório: sem hora válida o firmware não publica data 1970.
+- Last Will retido em `.../status` e reconexão com intervalo.
+- Credenciais fora do código versionado.
 
 ## Estrutura
 
 ```text
-firmware/
-├── platformio.ini          # placa, libs (ArduinoJson, PubSubClient), flags
-└── src/
-    ├── config.h            # ⇦ MODO_SENSOR (SIMULADO/FÍSICO), pinos, Wi-Fi/MQTT
-    ├── contrato.h          # nomes de campos e tópico (espelha o Python v1.1)
-    ├── main.cpp            # orquestra: escolhe a fonte, lê, publica
-    ├── hal/
-    │   ├── leitura.h           # struct Leitura (dado unificado)
-    │   ├── fonte_sensores.h    # interface FonteSensores (o Strategy)
-    │   ├── fonte_simulada.*    # lê NDJSON da USB e preenche Leitura (HIL)
-    │   └── fonte_fisica.*      # lê sensores reais (esqueleto + TODOs)
-    └── net/
-        └── publicador_mqtt.*   # Wi-Fi + MQTT + serialização v1.1
+include/secrets.example.h
+src/config.h
+src/contrato.h
+src/main.cpp
+src/hal/leitura.h
+src/hal/fonte_sensores.h
+src/hal/fonte_simulada.{h,cpp}
+src/hal/fonte_fisica.{h,cpp}
+src/net/publicador_mqtt.{h,cpp}
 ```
 
-## Como a troca simulado ↔ físico funciona
+## Próximas evoluções
 
-Em `src/config.h`:
-
-```c
-#define MODO_SENSOR FONTE_SIMULADA   // desenvolvimento (HIL pela USB)
-// #define MODO_SENSOR FONTE_FISICA  // protótipo com sensores reais
-```
-
-O `main.cpp` só conhece a interface `FonteSensores`; ele **não sabe** qual
-implementação está ativa. Toda a aplicação (montar telemetria, publicar em
-MQTT) permanece idêntica nos dois modos.
-
-## Fluxo de desenvolvimento (HIL) — passo a passo
-
-1. Ajuste Wi-Fi/MQTT em `src/config.h` (aponte `MQTT_HOST` para o seu broker
-   Mosquitto — ver [`../infra/server_config`](../infra/server_config)).
-2. Deixe `MODO_SENSOR FONTE_SIMULADA`.
-3. Compile e grave: `pio run -t upload` (ou pela Arduino IDE).
-4. No PC, alimente o ESP32 com dados simulados pela mesma porta USB:
-   ```bash
-   python ../simulador/central_sensores.py --porta COM5 --cenario auto
-   ```
-5. Observe o ESP32 publicar no broker; valide com o `sink` da PoC:
-   ```bash
-   python ../poc/consumidor_metricas.py --host localhost
-   ```
-
-## Sensores (modo físico)
-
-| Grandeza | Módulo | Barramento | Endereço/Pino |
-|---|---|---|---|
-| CO₂ | SCD41 | I2C | `0x62` |
-| Temp/Umidade | SHT31-D | I2C | `0x44` |
-| VOC | SGP40 | I2C | `0x59` |
-| Partículas | PMS7003 | UART2 | RX=16, TX=17 |
-| GLP | MiCS-5524 | ADC | GPIO34 |
-
-Ao montar o protótipo: habilite as bibliotecas em `platformio.ini`, preencha os
-`ler*()` em `hal/fonte_fisica.cpp` e **calibre** cada sensor (em especial o
-MiCS-5524, que tem aquecedor e curva própria).
-
-## Notas de robustez e limitações
-
-- **Heartbeat do elo serial:** sem quadro por `TIMEOUT_SENSOR_MS`, a leitura
-  vira `DEGRADED` e depois `ERROR` — nunca dado velho silencioso.
-- **`message_id`** é um pseudo-ULID (tempo + aleatório) — cumpre a idempotência.
-- **`sent_at`** exige **NTP** (o firmware chama `configTime`); sem rede/hora, a
-  data sai incorreta.
-- **QoS:** o `PubSubClient` publica em **QoS 0**; o contrato pede **QoS 1**. Para
-  QoS 1 de saída real, avalie uma lib MQTT assíncrona numa evolução (nota em
-  `publicador_mqtt.cpp`).
-- **TLS:** defina `MQTT_TLS` e carregue a CA para o listener 8883.
+Persistência limitada de mensagens, watchdog/diagnóstico, OTA assinada com
+rollback, mTLS por dispositivo e calibração/compensação registradas. Critérios
+de release no roadmap de firmware.

@@ -24,7 +24,7 @@ já está pronto e testado.
 | `normal` | operação típica de ambiente fechado |
 | `pico_poluicao` | particulado alto (trânsito, obra, fumaça externa) |
 | `incendio` | CO₂ e particulado muito altos, VOC alto, temperatura sobe |
-| `vazamento_glp` | pico de GLP (`lpg_ppm`) — cenário crítico do MiCS-5524 |
+| `vazamento_glp` | valor sintético alto em `lpg_ppm`; exercita regras, não calibra o MiCS-5524 |
 | `auto` | majoritariamente normal, injetando eventos aleatórios |
 
 ## Uso
@@ -51,6 +51,7 @@ python central_sensores.py --self-test
 {"t":"sensors","seq":128,"co2_ppm":812,"voc_index":140,"lpg_ppm":6,"pm1_ugm3":9.2,"pm25_ugm3":14.7,"pm10_ugm3":22.1,"temperature_c":24.8,"humidity_pct":51.3,"cenario":"normal"}
 ```
 
+- Os valores são sintéticos e não representam resposta metrológica dos sensores.
 - `co2_ppm`, `voc_index`, `lpg_ppm` são inteiros; particulados/temperatura/
   umidade são ponto flutuante. Mesmos nomes do contrato v1.1.
 - O firmware detecta lacunas por `seq` e aplica **timeout/heartbeat**: se os

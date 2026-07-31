@@ -1,15 +1,13 @@
-# Web — Painel Gerencial para Leigos (Fase 2, scaffold)
+# Web — Painel gerencial MVP
 
 Dashboard **legível e conduzível por um usuário leigo**. A pessoa abre e entende
 em 3 segundos se o ar está bom e o que fazer — sem jargão.
 
-## Stack (espelha o web do Painel_UFG)
+## Stack atual
 
-- **Next.js** (App Router) + **React** + **TypeScript**.
-- **Tailwind CSS** + **next-themes** (claro/escuro).
-- **TanStack Query** (dados) + **Zustand** (estado) + **react-hot-toast**.
-- Gráficos: começar com o **`charts.js`** (SVG puro, sem dependências) do
-  **IoT-IDEA** para um MVP imediato; evoluir para componentes React.
+- HTML/CSS/JavaScript sem etapa de build.
+- `charts.js` com sparkline SVG sem dependências.
+- REST + WebSocket do backend; modo mock para demonstração.
 - Consome a API + WebSocket do [`../backend`](../backend).
 
 ## Princípios de legibilidade para leigos
@@ -24,7 +22,7 @@ em 3 segundos se o ar está bom e o que fazer — sem jargão.
 - **Tempo real** via WebSocket, com "última atualização há X s".
 - **Página de histórico** com gráficos de área por período (dia/semana).
 
-## Telas (rascunho)
+## Evolução planejada
 
 | Tela | Conteúdo |
 |---|---|
@@ -44,6 +42,5 @@ web/
 └── package.json
 ```
 
-Reaproveita a organização de componentes/`ui` e o `data-table`/`charts` do
-Painel_UFG. O app **mobile** (Flutter, em [`../../mobile`](../../mobile)) consome
-a **mesma API**, garantindo paridade web/mobile.
+Next.js/TypeScript, histórico persistente, eventos e paridade mobile estão no
+[`../../docs/ROADMAP_SOFTWARE.md`](../../docs/ROADMAP_SOFTWARE.md).

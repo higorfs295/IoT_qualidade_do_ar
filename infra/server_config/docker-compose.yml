@@ -110,7 +110,7 @@ services:
     environment:
       POSTGRES_DB: thingsboard
       POSTGRES_USER: thingsboard
-      POSTGRES_PASSWORD: ${TB_POSTGRES_PASSWORD:-thingsboard}
+      POSTGRES_PASSWORD: ${TB_POSTGRES_PASSWORD:?defina TB_POSTGRES_PASSWORD no arquivo .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -148,7 +148,7 @@ services:
       TB_QUEUE_TYPE: in-memory
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
       SPRING_DATASOURCE_USERNAME: thingsboard
-      SPRING_DATASOURCE_PASSWORD: ${TB_POSTGRES_PASSWORD:-thingsboard}
+      SPRING_DATASOURCE_PASSWORD: ${TB_POSTGRES_PASSWORD:?defina TB_POSTGRES_PASSWORD no arquivo .env}
       DATABASE_TS_TYPE: sql
       # Controlam a instalacao do schema na primeira execucao (ver .env.example).
       INSTALL_TB: ${INSTALL_TB:-false}

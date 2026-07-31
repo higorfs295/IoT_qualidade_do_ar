@@ -11,13 +11,15 @@
     { k: "pm10_ugm3",     nome: "Poeira (PM10)", emoji: "💨", un: "µg/m³", lim: [50, 80], ref: "bom < 50" },
     { k: "pm1_ugm3",      nome: "Partículas finas (PM1)", emoji: "✨", un: "µg/m³", lim: [20, 30], ref: "bom < 20" },
     { k: "voc_index",     nome: "Cheiros/químicos (VOC)", emoji: "🧴", un: "",   lim: [150, 250], ref: "~100 é limpo" },
-    { k: "lpg_ppm",       nome: "Gás de cozinha (GLP)", emoji: "🔥", un: "ppm",  lim: [50, 100], ref: "bom ≈ 0" },
+    { k: "lpg_ppm",       nome: "Indicador experimental de gás", emoji: "🧪", un: "ppm", lim: [50, 100], ref: "exige calibração específica" },
     { k: "temperature_c", nome: "Temperatura", emoji: "🌡️", un: "°C", lim: null, ref: "conforto 20–26" },
     { k: "humidity_pct",  nome: "Umidade", emoji: "💧", un: "%", lim: null, ref: "conforto 40–60" },
   ];
 
   var series = {};      // k -> [valores]
   var dispositivoAtual = null;
+  var metricasTimer = null;
+  var reconectarTimer = null;
 
   function nivel(k, v, lim) {
     if (v == null) return "neutro";
@@ -29,8 +31,8 @@
 
   var VEREDITOS = {
     bom:     { emoji: "🙂", titulo: "Ar bom", acao: "Ambiente saudável.", cls: "bom" },
-    atencao: { emoji: "😐", titulo: "Atenção", acao: "Abra a janela e ventile o ambiente.", cls: "atencao" },
-    ruim:    { emoji: "⚠️", titulo: "Ar ruim", acao: "Ventile agora. Se houver cheiro de gás, saia e não acione interruptores.", cls: "ruim" },
+    atencao: { emoji: "😐", titulo: "Atenção", acao: "Verifique a ventilação e possíveis fontes de poluição.", cls: "atencao" },
+    ruim:    { emoji: "⚠️", titulo: "Leitura elevada", acao: "Confirme com instrumento adequado e siga o plano de segurança do local.", cls: "ruim" },
     neutro:  { emoji: "❓", titulo: "Sem dados", acao: "Aguardando leitura do sensor…", cls: "neutro" },
   };
   var ORD = { neutro: 0, bom: 1, atencao: 2, ruim: 3 };
@@ -38,9 +40,9 @@
   function vereditoGeral(msg) {
     if (!msg) return "neutro";
     var q = msg.quality || {};
+    if (q.gas_status === "UNSAFE") return "ruim";
     if (q.sensor_status === "ERROR" || q.gas_status === "UNKNOWN") return "neutro";
     var pior = "bom";
-    if (q.gas_status === "UNSAFE") pior = "ruim";
     var m = msg.measurements || {};
     METRICAS.forEach(function (def) {
       var n = nivel(def.k, m[def.k], def.lim);
@@ -50,7 +52,7 @@
   }
 
   function fmt(v) {
-    if (v == null) return "—";
+    if (v == null || typeof v !== "number" || !isFinite(v)) return "—";
     return Number.isInteger(v) ? String(v) : v.toFixed(1);
   }
 
@@ -112,9 +114,14 @@
     var proto = location.protocol === "https:" ? "wss" : "ws";
     var ws = new WebSocket(proto + "://" + location.host + (CFG.WS_PATH || "/ws"));
     ws.onopen = function () { setConexao(true, "ao vivo"); };
-    ws.onclose = function () { setConexao(false, "reconectando…"); setTimeout(iniciarLive, 3000); };
+    ws.onclose = function () {
+      setConexao(false, "reconectando…");
+      clearTimeout(reconectarTimer);
+      reconectarTimer = setTimeout(iniciarLive, 3000);
+    };
     ws.onmessage = function (ev) {
-      var d = JSON.parse(ev.data);
+      var d;
+      try { d = JSON.parse(ev.data); } catch (_) { return; }
       if (d.tipo === "telemetria") {
         if (!dispositivoAtual) dispositivoAtual = d.device_id;
         if (d.device_id === dispositivoAtual) render(d.msg);
@@ -124,9 +131,13 @@
     // carga inicial
     fetch(BASE + "/api/dispositivos").then(function (r) { return r.json(); }).then(function (lst) {
       var sel = document.getElementById("seletorDispositivo");
-      sel.innerHTML = lst.map(function (d) {
-        return '<option value="' + d.device_id + '">' + d.device_id + "</option>";
-      }).join("");
+      sel.replaceChildren();
+      lst.forEach(function (d) {
+        var opt = document.createElement("option");
+        opt.value = d.device_id;
+        opt.textContent = d.device_id;
+        sel.appendChild(opt);
+      });
       sel.onchange = function () {
         dispositivoAtual = sel.value;
         fetch(BASE + "/api/dispositivos/" + encodeURIComponent(sel.value) + "/atual")
@@ -135,7 +146,7 @@
       if (lst.length) { dispositivoAtual = lst[0].device_id; render(lst[0].ultimo); }
     }).catch(function () {});
     atualizarMetricas();
-    setInterval(atualizarMetricas, 5000);
+    if (!metricasTimer) metricasTimer = setInterval(atualizarMetricas, 5000);
   }
 
   // --- Modo MOCK (sem backend, para demonstrar) ------------------------------

@@ -2,10 +2,10 @@
 """
 sensor.py — A entidade "Coisa" (dispositivo de borda).
 
-Papel na arquitetura: representa **um sensor fisico** (o ESP32 + SCD41 + ENS160
-+ PMS5003 da Atividade 1). Cada instancia carrega sua identidade, seu contador
-de sequencia e o estado atual das medicoes, e produz uma leitura por vez no
-contrato v1.0.
+Papel na arquitetura: representa **uma estacao virtual** equivalente ao ESP32 +
+SCD41 + SHT31 + SGP40 + PMS7003 + entrada analogica experimental. Cada
+instancia carrega sua identidade, sequencia e estado das medicoes e produz uma
+leitura por vez no contrato v1.1.
 
 Este objeto NAO conhece MQTT nem rede — ele so sabe "medir". Quem transporta a
 leitura e o Gateway. Essa separacao de responsabilidades e o que torna a PoC
@@ -40,7 +40,7 @@ class Faixa:
 # gerar dados verossimeis. Alinhadas aos modulos escolhidos no BASE_FINAL.md:
 #   SCD41    -> co2, temperatura, umidade
 #   SGP40    -> voc_index (indice VOC 0-500, ~100 em ar limpo)
-#   MiCS-5524-> lpg_ppm (GLP/combustiveis)
+#   MiCS-5524-> lpg_ppm (valor sintético; hardware real publica tensão bruta)
 #   PMS7003  -> pm1, pm2.5, pm10
 #   SHT31    -> temperatura, umidade
 #
@@ -63,15 +63,16 @@ FAIXAS: dict[str, Faixa] = {
 class Dispositivo:
     """Estado de um sensor virtual: identidade, sequencia e leituras correntes."""
 
-    __slots__ = ("device_id", "site_id", "sequence", "rng", "_valores", "firmware")
+    __slots__ = ("device_id", "site_id", "sequence", "rng", "_valores", "firmware", "boot_id")
 
     def __init__(self, device_id: str, site_id: str, seed: int):
         self.device_id = device_id
         self.site_id = site_id
         self.sequence = 0
-        self.firmware = "1.0.0"
+        self.firmware = "1.1.0-sim"
         # RNG por dispositivo => reprodutivel e sem lock global.
         self.rng = random.Random(seed)
+        self.boot_id = contrato.gerar_ulid(self.rng)
         # Ponto de partida aleatorio na metade inferior de cada faixa.
         self._valores = {
             nome: self.rng.uniform(
@@ -92,7 +93,7 @@ class Dispositivo:
 
     def proxima_leitura(self, prob_degradar: float) -> dict:
         """
-        Produz um payload no contrato v1.0. Injeta falhas ocasionais para
+        Produz um payload no contrato v1.1. Injeta falhas ocasionais para
         exercitar o tratamento de nulos e o `sensor_status` do contrato.
 
         prob_degradar: probabilidade de a leitura vir DEGRADED/ERROR.
@@ -140,6 +141,7 @@ class Dispositivo:
             },
             "metadata": {
                 "firmware_version": self.firmware,
+                "boot_id": self.boot_id,
                 "rssi_dbm": -40 - int(self.rng.random() * 50),  # -40 a -90 dBm
             },
         }

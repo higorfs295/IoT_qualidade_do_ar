@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-contrato.py — Fonte unica de verdade do contrato de dados (schema v1.0).
+contrato.py — Fonte unica de verdade do contrato de dados (schemas v1.0/v1.1).
 
 Papel nesta arquitetura: **contrato de interface**. Todo mundo (sensor,
 gateway, sink) fala a mesma lingua importando daqui. Se o contrato mudar, muda
@@ -15,6 +15,8 @@ para ser importado por qualquer processo/thread e picklavel para multiprocessing
 from __future__ import annotations
 
 import random
+import math
+import re
 import time
 from datetime import datetime, timezone
 
@@ -22,8 +24,8 @@ from datetime import datetime, timezone
 # Constantes do contrato
 # ---------------------------------------------------------------------------
 # Versao emitida por padrao. O v1.1 (base_final) evolui o v1.0 do Wilson de
-# forma ADITIVA: acrescenta voc_index (SGP40) e lpg_ppm (MiCS-5524), refletindo
-# os modulos escolhidos no BASE_FINAL.md. O validador aceita as duas versoes.
+# forma ADITIVA: acrescenta voc_index e reserva lpg_ppm para um canal realmente
+# calibrado. O hardware atual publica gas_raw_v como diagnóstico opcional.
 SCHEMA_VERSION = "1.1"
 SCHEMA_VERSIONS_ACEITAS = ("1.0", "1.1")
 
@@ -33,7 +35,7 @@ SUFIXO_TOPICO = "telemetria"
 
 # Medidas obrigatorias por versao do schema.
 #   v1.0: co2, tvoc_ppb, particulados, temp, umidade.
-#   v1.1: troca tvoc_ppb por voc_index (SGP40) e acrescenta lpg_ppm (MiCS-5524).
+#   v1.1: troca tvoc_ppb por voc_index e mantém lpg_ppm nulo sem calibração.
 # co2/tvoc_ppb/voc_index/lpg_ppm sao inteiros; o restante e ponto flutuante
 # (o contrato exige numero, nunca texto com unidade).
 MEDIDAS_V10 = (
@@ -55,8 +57,9 @@ MEDIDAS_V11 = (
     "temperature_c",
     "humidity_pct",
 )
+MEDIDAS_OPCIONAIS = ("gas_raw_v",)
 # Uniao de todas as medidas conhecidas (usada por consumidores genericos).
-MEDIDAS = tuple(dict.fromkeys(MEDIDAS_V10 + MEDIDAS_V11))
+MEDIDAS = tuple(dict.fromkeys(MEDIDAS_V10 + MEDIDAS_V11 + MEDIDAS_OPCIONAIS))
 
 # Medidas obrigatorias indexadas pela versao do schema.
 MEDIDAS_POR_VERSAO = {"1.0": MEDIDAS_V10, "1.1": MEDIDAS_V11}
@@ -75,6 +78,25 @@ CAMPOS_OBRIGATORIOS = (
 # Valores controlados (enums) do bloco quality.
 GAS_STATUS = ("SAFE", "UNSAFE", "UNKNOWN")
 SENSOR_STATUS = ("OK", "DEGRADED", "ERROR")
+
+# Regras compartilhadas com o backend. Os limites abaixo sao limites de
+# plausibilidade/serializacao (protegem a ingestao contra valores absurdos),
+# nao limites de saude nem faixas de calibracao do instrumento.
+LIMITES_MEDIDAS = {
+    "co2_ppm": (0, 100_000),
+    "tvoc_ppb": (0, 10_000_000),
+    "voc_index": (0, 500),
+    "lpg_ppm": (0, 1_000_000),
+    "gas_raw_v": (0, 5.5),
+    "pm1_ugm3": (0, 10_000),
+    "pm25_ugm3": (0, 10_000),
+    "pm10_ugm3": (0, 10_000),
+    "temperature_c": (-50, 100),
+    "humidity_pct": (0, 100),
+}
+
+_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
+_ULID_RE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 
 
 # ---------------------------------------------------------------------------
@@ -131,8 +153,11 @@ def parse_sent_at(valor: str) -> float | None:
     if not isinstance(valor, str):
         return None
     try:
-        return datetime.fromisoformat(valor.replace("Z", "+00:00")).timestamp()
-    except ValueError:
+        instante = datetime.fromisoformat(valor.replace("Z", "+00:00"))
+        if instante.tzinfo is None:
+            return None
+        return instante.timestamp()
+    except (ValueError, OverflowError):
         return None
 
 
@@ -156,15 +181,46 @@ def validar_contrato(msg: dict) -> str | None:
     versao = msg.get("schema_version")
     if versao not in SCHEMA_VERSIONS_ACEITAS:
         return f"schema_version inesperado: {versao}"
-    if not isinstance(msg.get("sequence"), int):
-        return "sequence nao inteiro"
+    if not _ULID_RE.fullmatch(str(msg.get("message_id", ""))):
+        return "message_id nao e ULID canonico"
+    for identificador in ("device_id", "site_id"):
+        if not isinstance(msg.get(identificador), str) or not _ID_RE.fullmatch(msg[identificador]):
+            return f"{identificador} invalido"
+    if parse_sent_at(msg.get("sent_at")) is None:
+        return "sent_at invalido (use RFC 3339 com fuso)"
+    sequencia = msg.get("sequence")
+    if isinstance(sequencia, bool) or not isinstance(sequencia, int) or sequencia < 0:
+        return "sequence deve ser inteiro nao negativo"
     medidas = msg.get("measurements")
     if not isinstance(medidas, dict):
         return "measurements nao e objeto"
     for m in MEDIDAS_POR_VERSAO[versao]:
         if m not in medidas:
             return f"medida ausente: {m}"
+        valor = medidas[m]
+        if valor is None:
+            continue  # ausencia explicita e valida quando o sensor esta degradado
+        if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+            return f"medida nao numerica: {m}"
+        if not math.isfinite(valor):
+            return f"medida nao finita: {m}"
+        minimo, maximo = LIMITES_MEDIDAS[m]
+        if not minimo <= valor <= maximo:
+            return f"medida fora da faixa plausivel: {m}"
+    for m in MEDIDAS_OPCIONAIS:
+        if m not in medidas or medidas[m] is None:
+            continue
+        valor = medidas[m]
+        if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+            return f"medida nao numerica: {m}"
+        if not math.isfinite(valor):
+            return f"medida nao finita: {m}"
+        minimo, maximo = LIMITES_MEDIDAS[m]
+        if not minimo <= valor <= maximo:
+            return f"medida fora da faixa plausivel: {m}"
     quality = msg.get("quality")
+    if quality is not None and not isinstance(quality, dict):
+        return "quality nao e objeto"
     if isinstance(quality, dict):
         gs = quality.get("gas_status")
         ss = quality.get("sensor_status")
@@ -172,4 +228,15 @@ def validar_contrato(msg: dict) -> str | None:
             return f"gas_status invalido: {gs}"
         if ss is not None and ss not in SENSOR_STATUS:
             return f"sensor_status invalido: {ss}"
+        if ss == "OK" and any(medidas[m] is None for m in MEDIDAS_POR_VERSAO[versao]):
+            return "sensor_status OK com medida obrigatoria nula"
+    metadata = msg.get("metadata")
+    if metadata is not None and not isinstance(metadata, dict):
+        return "metadata nao e objeto"
     return None
+
+
+def validar_topico(topico: str, msg: dict) -> str | None:
+    """Confere se site/device do topico coincidem com o payload validado."""
+    esperado = montar_topico(msg.get("site_id", ""), msg.get("device_id", ""))
+    return None if topico == esperado else f"topico divergente: esperado {esperado}"

@@ -1,0 +1,22 @@
+Ref,Quantidade,Descricao,Valor/MPN inicial,Footprint inicial,Status/observacao
+J1,1,Entrada de alimentacao polarizada 5 V >=2 A,TBD conforme cabo,THT,TBD medir/comprar primeiro
+F1,1,Polyfuse resetavel,hold 1.1-1.5 A,THT ou 1812,dimensionar apos medir corrente
+D1,1,Diodo Schottky de isolamento do ESP32,SS34,SMA,confirmar queda sob carga
+D2,1,TVS para rail 5 V,TBD,SMA,selecionar por VRWM/clamp
+U2,1,LDO 3.3 V >=300 mA,AP2112K-3.3,SOT-23-5,seguir capacitores do datasheet
+C1,1,Capacitor bulk 5 V,1000 uF 10 V,THT radial,low ESR
+C2,1,Capacitor bulk 5 V,10 uF 10 V,0805/1206,
+C3-C8,6,Desacoplamento,100 nF 25 V X7R,0805,um por carga/conector
+C9-C10,2,Capacitores do LDO,1 uF ou datasheet,0805,confirmar U2
+R1,1,Divisor ADC superior,15 k 1%,0805,
+R2,1,Divisor ADC inferior,10 k 1%,0805,
+R3,1,Serie/protecao ADC,1 k 1%,0805,
+C11,1,Filtro ADC,100 nF,0805,
+R4-R5,2,Pull-up I2C,4.7 k 1%,0805,usar jumpers selecionaveis
+SJ1-SJ2,2,Jumper de solda pull-up I2C,3 pads,SMD,
+J_SHT/J_SGP/J_SCD,3,Conector I2C 4 vias,JST-SH/Qwiic confirmado,SMD,verificar pin 1 e orientacao
+J_PMS,1,Conector do PMS7003,TBD pelo mating cable,TBD,nao substituir por JST generico
+J_GAS,1,Conector breakout analogico 3 vias,TBD,THT/SMT,apenas saida condicionada 0-5 V
+J_ESP_L-J_ESP_R,2,Header femea ESP32 DevKit 30 pinos,2x15 total 2.54 mm,THT,distancia entre fileiras medida
+TP1-TP6,6,Test points,5V 3V3 GND SDA SCL ADC,loop/pad,identificar na serigrafia
+H1-H4,4,Furos de montagem,M3 NPTH,NPTH,confirmar com case
