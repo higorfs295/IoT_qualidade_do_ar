@@ -23,6 +23,9 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 .controles { display: flex; gap: 10px; align-items: center; }
 #seletorDispositivo { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--borda);
   background: var(--bg); color: var(--texto); }
+#installApp { padding: 7px 11px; border: 0; border-radius: 8px; cursor: pointer;
+  color: white; background: #147d72; font-weight: 700; }
+#installApp:hover { filter: brightness(.92); }
 .conexao { font-size: .8rem; padding: 4px 10px; border-radius: 999px; }
 .conexao.on { background: var(--bom-bg); color: var(--bom); }
 .conexao.off { background: var(--neutro-bg); color: var(--neutro); }

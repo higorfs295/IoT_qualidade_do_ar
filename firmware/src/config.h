@@ -34,8 +34,12 @@
 // -----------------------------------------------------------------------------
 // Identidade do dispositivo (entra no topico e no payload v1.1)
 // -----------------------------------------------------------------------------
+#ifndef DEVICE_ID
 #define DEVICE_ID        "esp32-proto-01"
+#endif
+#ifndef SITE_ID
 #define SITE_ID          "campus-ufg-bloco-inf"
+#endif
 #define FIRMWARE_VERSION "1.2.0"
 #define BOARD_MODEL      "ESP-WROOM-32 DevKit 30P USB-C"
 #define HARDWARE_REVISION "PROTO-REV-A"
@@ -55,7 +59,9 @@
 // -----------------------------------------------------------------------------
 // Ritmo de publicacao (contrato: 1 leitura consolidada por sensor a cada 60 s)
 // -----------------------------------------------------------------------------
+#ifndef INTERVALO_PUBLICACAO_MS
 #define INTERVALO_PUBLICACAO_MS 60000UL
+#endif
 
 // -----------------------------------------------------------------------------
 // Elo HIL (modo simulado) — Serial/USB

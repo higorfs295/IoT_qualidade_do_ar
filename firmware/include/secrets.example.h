@@ -4,6 +4,10 @@
 #define WIFI_SSID "<SSID_DA_REDE>"
 #define WIFI_PASS "<SENHA_DO_WIFI>"
 
+#define DEVICE_ID "esp32-proto-01"
+#define SITE_ID "campus-ufg-bloco-inf"
+#define INTERVALO_PUBLICACAO_MS 60000UL
+
 #define MQTT_HOST "192.168.0.10"
 #define MQTT_PORT 1883
 #define MQTT_USER ""

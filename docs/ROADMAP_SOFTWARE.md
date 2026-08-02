@@ -1,94 +1,112 @@
 # Roadmap de backend, web, mobile e nuvem
 
-## Backend — do MVP para serviço persistente
+Este roadmap parte da versão local já executável. Itens concluídos não devem ser
+reabertos sem evidência de regressão; os próximos gates tratam de escala,
+segurança multiusuário e operação real.
 
-### B0 — base atual
+## Backend
 
-MVP Node com MQTT.js, REST, WebSocket, deduplicação limitada e série em memória.
-É adequado para demonstração local; reiniciar o processo apaga o histórico.
+### B0 — base local concluída
 
-### B1 — modularização e persistência
+- [x] MQTT.js, REST e WebSocket com contrato v1.1 compartilhado.
+- [x] Deduplicação, lacunas, reinícios e séries com limites explícitos.
+- [x] Snapshot JSON versionado e atômico, restaurado após reinício.
+- [x] Health/readiness, métricas JSON/Prometheus e graceful shutdown.
+- [x] OpenAPI e testes de contrato, persistência e processo HTTP real.
+- [x] Imagem não-root, volume de dados e healthcheck no Compose.
 
-- Separar bootstrap, configuração, domínio, ingestor MQTT, repositórios e rotas.
-- Adotar Fastify + TypeScript e validação gerada do JSON Schema.
-- PostgreSQL com tabelas `device`, `telemetry`, `alert_event`, `ingest_reject`.
-- Chaves: `message_id` único; índice `(device_id, sent_at)`; estado atual por
-  `(site_id, device_id)`; política explícita para `boot_id`/`sequence`.
-- Migrações, seed e teste de restauração de backup.
+Gate cumprido: a instalação local reinicia sem perder o estado limitado e sem
+duplicar mensagens conhecidas na janela persistida.
 
-Gate: reiniciar o backend sem perder histórico nem duplicar mensagens QoS 1.
+### B1 — histórico longo e consultas de produto
 
-### B2 — API e observabilidade
+- [ ] Separar domínio, transporte e repositórios em módulos TypeScript.
+- [ ] PostgreSQL/TimescaleDB com `device`, `telemetry`, `alert_event` e
+  `ingest_reject`; `message_id` único e índices por dispositivo/tempo.
+- [ ] Migrações, retenção, agregações, paginação e filtros `from/to`.
+- [ ] Backup/restauração automatizado e migração importando o snapshot local.
+- [ ] Teste de carga com SLO de latência, vazão e uso de memória documentado.
 
-- Paginação, filtros `from/to`, agregações temporais e limites de consulta.
-- OpenAPI, erros estáveis e testes de contrato.
-- Métricas Prometheus: ingestão, rejeição, duplicação, lacuna, atraso, conexões.
-- Logs JSON com correlação por `message_id` sem registrar segredos.
-- Health/readiness separados; graceful shutdown do MQTT/HTTP/banco.
+Gate: retenção e recuperação aprovadas com volume representativo e sem memória
+proporcional ao histórico.
 
-Gate: teste de carga cumpre SLO documentado e não cresce memória sem limite.
+### B2 — segurança e operação compartilhada
 
-### B3 — segurança
+- [ ] TLS/mTLS no broker, ACL por dispositivo e rotação de certificados.
+- [ ] OIDC para usuários, RBAC por site e trilha de auditoria.
+- [ ] Rate limit, política de CORS, logs JSON correlacionados e alertas de SLO.
+- [ ] Segredos externos, SBOM, varredura de dependências e threat model.
+- [ ] Alta disponibilidade apenas após teste explícito de failover.
 
-- TLS/mTLS no broker, ACL por dispositivo e rotação de credenciais.
-- OIDC para usuários; RBAC por site; trilha de auditoria.
-- Ingestão HTTP desabilitada em produção ou protegida por token rotacionável.
-- Rate limit, limites de payload, dependências auditadas e threat model.
+Gate: checklist OWASP/API, rotação, restauração e isolamento entre sites
+aprovados. A ingestão HTTP continua desabilitada no Compose de produção local.
 
-Gate: checklist OWASP/API e teste de restauração/rotação aprovados.
+## Web/PWA
 
-## Web
+### W0 — painel instalável concluído
 
-### W1 — estabilizar o MVP
+- [x] Estado atual, histórico curto, métricas, WebSocket e reconexão.
+- [x] Layout responsivo, texto além de cor e aviso de uso experimental.
+- [x] Manifest, ícone, service worker e fallback do shell offline.
+- [x] Conteúdo estático com CSP e sem injeção por identificadores.
 
-- Testes de funções de classificação e reconexão.
-- Estado “desatualizado” por idade de recepção, não só `sent_at` do dispositivo.
-- Explicar que faixas de PM com média temporal não equivalem a uma leitura
-  instantânea; manter aviso de protótipo sempre visível.
-- Não depender apenas de cores; preservar texto, ícones e contraste.
+### W1 — experiência de produto
 
-### W2 — aplicação de produto
+- [ ] Testes e2e em Chromium/Firefox/WebKit e auditoria WCAG/Lighthouse.
+- [ ] Páginas dedicadas de histórico, eventos e inventário de dispositivos.
+- [ ] Fuso configurável, agregações temporais e lacunas visíveis nos gráficos.
+- [ ] Autenticação integrada ao backend B2.
+- [ ] Push opcional somente depois de regras de alerta validadas.
 
-- Next.js/TypeScript ou SPA equivalente consumindo OpenAPI.
-- Páginas Agora, Histórico, Eventos e Dispositivo.
-- Gráficos com lacunas visíveis, fuso configurável e agregação coerente.
-- PWA, cache somente de leitura e comportamento offline explícito.
-
-Gate: Lighthouse/acessibilidade, testes e2e e teste com usuário leigo.
+Gate: tarefas críticas concluídas por usuário leigo e comportamento offline
+documentado sem sugerir que dados antigos são atuais.
 
 ## Alertas
 
-- Centralizar regras no backend; web/mobile apenas exibem o resultado.
-- Aplicar duração mínima, histerese, cooldown e estado de reconhecimento.
-- Separar “dado indisponível”, “faixa operacional excedida” e “alarme externo”.
-- Nunca emitir instrução de emergência baseada apenas no sensor experimental.
-- Registrar versão da regra, valores, janela, origem e quem reconheceu.
+1. Definir uso pretendido, responsáveis e linguagem que não sugira certificação.
+2. Centralizar regras versionadas no backend, nunca duplicar limiares na UI.
+3. Aplicar janela mínima, histerese, cooldown e reconhecimento.
+4. Separar dado indisponível, faixa operacional e alarme externo certificado.
+5. Persistir valores, regra, janela, origem, envio e reconhecimento.
+6. Testar falsos positivos/negativos antes de habilitar notificações.
 
-## Mobile Flutter
+## Mobile
 
-1. Criar `mobile/pubspec.yaml` e estrutura feature-first.
-2. Gerar modelos do OpenAPI/JSON Schema; não copiar manualmente o contrato.
-3. Riverpod, Dio e `web_socket_channel`, com reconexão/backoff.
-4. Telas Agora/Histórico/Eventos/Dispositivos e acessibilidade.
-5. Push pelo backend; tokens protegidos e revogáveis.
-6. Testes unitários, widget e integração em Android/iOS.
+A PWA é o cliente móvel suportado na base atual. Flutter só se justifica quando
+houver requisito nativo que a PWA não cubra.
 
-Gate: paridade de regra e estado com o web usando os mesmos fixtures.
+1. Confirmar necessidade de push em segundo plano, BLE ou integração de SO.
+2. Criar `pubspec.yaml` e estrutura feature-first.
+3. Gerar modelos a partir de OpenAPI/JSON Schema.
+4. Usar Riverpod, Dio e `web_socket_channel` com backoff.
+5. Compartilhar fixtures e regras do backend; não copiar limiares.
+6. Executar testes unitários, widget e integração em Android/iOS.
 
-## Nuvem
+Gate: paridade de contrato e estado com a web usando as mesmas fixtures.
 
-- Começar com um único ambiente pequeno e infraestrutura como código.
-- AWS IoT Core -> regra -> SQS/DLQ -> consumidor idempotente -> banco/data lake.
-- A base executável está em [`../infra/aws/`](../infra/aws/): template
-  CloudFormation do sandbox, política por Thing, regra de roteamento e consumidor
-  Lambda de referência.
-- Para conexão direta, compilar `esp32-aws` com mTLS e limitar buffers/telemetria;
-  para uma frota local, avaliar Mosquitto de borda como concentrador antes de
-  impor TLS e certificados a cada nó.
-- Orçamento e alarmes de custo antes do benchmark.
-- Retenção por classe, criptografia, IAM mínimo e logs de auditoria.
-- Testar reprocessamento da DLQ e recuperação regional antes do piloto.
+## AWS
 
-Não ligar uma bridge de produção apenas copiando o exemplo Mosquitto: endpoint,
-SNI, cadeia de CA, certificados, política IoT e semântica de sessão precisam ser
-validados especificamente para o ambiente.
+### C0 — base reproduzível concluída localmente
+
+- [x] Perfil `esp32-aws` com mTLS e buffers compatíveis com ESP-WROOM-32.
+- [x] CloudFormation para IoT Rule, SQS/DLQ, S3, Lambda e DynamoDB.
+- [x] Política de Thing mínima e consumidor idempotente com resposta parcial.
+- [x] Roteiros de implantação, custo, teardown e validação.
+
+### C1 — sandbox autorizado
+
+- [ ] Criar orçamento/alarmes antes dos recursos.
+- [ ] Aplicar o template em conta sandbox e registrar outputs.
+- [ ] Emitir um certificado por unidade; nunca versionar chaves privadas.
+- [ ] Validar QoS 1, SQS/DLQ, objeto S3, estado DynamoDB e observabilidade.
+- [ ] Exercitar revogação, reprocessamento e remoção completa dos recursos.
+
+### C2 — frota
+
+- [ ] Provisioning automatizado, inventário e rotação por dispositivo.
+- [ ] OTA assinada, staged rollout, rollback e métricas de campanha.
+- [ ] Retenção por classe, criptografia, auditoria e recuperação regional.
+- [ ] Comparar IoT Core direto com gateway Mosquitto de borda por custo e RAM.
+
+Não usar a configuração Mosquitto local como bridge de produção sem validar
+endpoint, SNI, cadeia CA, certificados, política IoT e sessão no ambiente real.

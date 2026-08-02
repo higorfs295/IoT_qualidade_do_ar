@@ -43,7 +43,7 @@ craque em uma pista.
 **O ESP32 — o mensageiro.**
 É um pequeno computador (do tamanho de um chiclete) que lê os cinco narizes,
 junta tudo em um "bilhete" organizado e envia pela internet. Pense nele como um
-carteiro that recolhe as cartas e as leva ao correio.
+carteiro que recolhe as cartas e as leva ao correio.
 
 **O broker MQTT — o correio.**
 É um servidor que recebe os bilhetes do mensageiro e entrega para quem estiver
@@ -145,11 +145,14 @@ sem correr risco.
 - O miolo do programa do aparelho (a "tomada universal" que troca dublê ↔ real).
 - O formulário padrão dos dados e o "correio" (broker) testado com milhares de
   aparelhos.
+- Uma instalação local em um comando, com broker, gerador de dados, backend
+  persistente e painel web instalável no computador ou celular.
 - A planta da placa (PCB) e da caixa, prontas para você desenhar/imprimir.
 
 **Próximos passos:**
 - Montar o aparelho físico (placa + caixa + sensores reais).
-- Ligar os painéis (site e app de celular) para qualquer pessoa acompanhar.
+- Validar o painel com usuários e, se houver necessidade comprovada, criar um
+  aplicativo Flutter nativo além da PWA já funcional.
 - Ligar avisos automáticos (ex.: mensagem no celular quando o ar ficar ruim).
 - Validar no sandbox AWS o caminho IoT Core → SQS/DLQ → S3/DynamoDB.
 

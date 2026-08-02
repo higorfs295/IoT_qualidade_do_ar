@@ -1,0 +1,129 @@
+openapi: 3.1.0
+info:
+  title: API da Estação IoT de Qualidade do Ar
+  version: 1.0.0
+  description: API local do backend MQTT, persistência e dashboard.
+servers:
+  - url: http://localhost:3001
+paths:
+  /api/health:
+    get:
+      summary: Estado do processo, MQTT e persistência
+      responses:
+        "200":
+          description: Processo ativo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /api/metricas:
+    get:
+      summary: Contadores operacionais em JSON
+      responses:
+        "200":
+          description: Contadores
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /metrics:
+    get:
+      summary: Métricas para coleta Prometheus
+      responses:
+        "200":
+          description: Exposição Prometheus
+          content:
+            text/plain:
+              schema: { type: string }
+  /api/dispositivos:
+    get:
+      summary: Lista os dispositivos conhecidos e o último estado
+      responses:
+        "200":
+          description: Dispositivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Device" }
+  /api/dispositivos/{device_id}/atual:
+    get:
+      summary: Última telemetria do dispositivo
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
+      responses:
+        "200":
+          description: Telemetria v1.1
+          content:
+            application/json:
+              schema: { $ref: "./telemetria-v1.1.schema.json" }
+        "404": { description: Dispositivo desconhecido }
+  /api/dispositivos/{device_id}/serie:
+    get:
+      summary: Série limitada de uma grandeza
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
+        - name: campo
+          in: query
+          schema: { type: string, default: co2_ppm }
+        - name: n
+          in: query
+          schema: { type: integer, minimum: 1, default: 200 }
+      responses:
+        "200":
+          description: Série
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  campo: { type: string }
+                  serie:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ts: { type: integer }
+                        valor: { type: [number, "null"] }
+  /api/ingest:
+    post:
+      summary: Ingestão auxiliar de desenvolvimento
+      description: Desabilitada por padrão em produção e no Compose.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "./telemetria-v1.1.schema.json" }
+      responses:
+        "200": { description: Mensagem processada }
+        "400": { description: JSON ou contrato inválido }
+        "404": { description: Ingestão HTTP desabilitada }
+        "413": { description: Corpo acima do limite }
+        "415": { description: Content-Type incorreto }
+components:
+  parameters:
+    DeviceId:
+      name: device_id
+      in: path
+      required: true
+      schema: { type: string }
+  schemas:
+    Device:
+      type: object
+      required: [device_id, site_id, online, ultimo]
+      properties:
+        device_id: { type: string }
+        site_id: { type: string }
+        online: { type: boolean }
+        ultimo: { $ref: "./telemetria-v1.1.schema.json" }
+    Health:
+      type: object
+      required: [ok, ready, mqtt_enabled, mqtt_connected, persistence_enabled, devices, uptime_s]
+      properties:
+        ok: { type: boolean }
+        ready: { type: boolean }
+        mqtt_enabled: { type: boolean }
+        mqtt_connected: { type: boolean }
+        persistence_enabled: { type: boolean }
+        persistence_last_saved_at: { type: [string, "null"], format: date-time }
+        persistence_error: { type: [string, "null"] }
+        devices: { type: integer, minimum: 0 }
+        uptime_s: { type: integer, minimum: 0 }

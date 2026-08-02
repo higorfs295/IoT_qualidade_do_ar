@@ -1,5 +1,9 @@
 # Infraestrutura Local — Broker e Plataforma
 
+> Para instalar a aplicação completa, use o [`../../compose.yaml`](../../compose.yaml)
+> da raiz ou `scripts/install.ps1`/`scripts/install.sh`. Este diretório permanece
+> como configuração avançada do broker, benchmark e ThingsBoard opcional.
+
 Automações para subir o ambiente que recebe a carga da PoC de ingestão
 (Atividade 3). Reproduz localmente a borda da arquitetura de produção: onde o
 plano da nuvem usa **AWS IoT Core**, aqui usamos um **Mosquitto** local; onde

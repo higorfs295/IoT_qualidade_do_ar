@@ -25,13 +25,17 @@ bring-up de [`../docs/ROADMAP_FIRMWARE.md`](../docs/ROADMAP_FIRMWARE.md).
 
 ## Configuração segura
 
-```powershell
-Copy-Item include\secrets.example.h include\secrets.h
+Na raiz do projeto:
+
+```bash
+python scripts/configure_firmware.py --ssid MINHA_REDE \
+  --mqtt-host 192.168.1.10 --device-id esp32-sala-01 --site-id minha-casa
 ```
 
-Edite `secrets.h`. Ele é ignorado pelo Git. Para TLS local, use a porta 8883,
-ative `MQTT_TLS` e forneça a CA. Para AWS, configure endpoint ATS, porta 8883,
-CA, certificado e chave exclusivos; o ambiente já ativa TLS+mTLS.
+O script solicita a senha sem eco, valida IDs/porta/intervalo e grava
+`include/secrets.h` com permissão restrita. Ele não sobrescreve um arquivo
+existente sem `--force`. Para AWS, use `--aws --mqtt-port 8883` e forneça CA,
+certificado e chave exclusivos; o ambiente já ativa TLS+mTLS.
 
 ## Placa e pinos
 

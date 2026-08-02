@@ -1,6 +1,7 @@
 # BASE_FINAL — Estação de Monitoramento de Qualidade do Ar (projeto real)
 
-> **Nota de revisão (31/07/2026):** este arquivo preserva o blueprint original.
+> **Nota de revisão (02/08/2026):** este arquivo preserva o blueprint original
+> e foi alinhado à instalação local final.
 > O estado auditado, correções e gates atuais estão no [`README.md`](README.md)
 > e em [`docs/STATUS_PROJETO.md`](docs/STATUS_PROJETO.md). Em caso de divergência,
 > esses documentos mais recentes prevalecem.
@@ -11,8 +12,8 @@
 > completo de ingestão, dashboard web e app mobile.
 >
 > UFG — Engenharia de Computação — Internet das Coisas — Higor Ferreira Silva.
-> Este documento **define e documenta** a base; o código nesta branch
-> (`base_final`) implementa o núcleo e deixa o restante scaffolded e planejado.
+> Este documento **define e documenta** a base; o software local está funcional
+> e as etapas que exigem hardware, fabricação ou conta AWS permanecem marcadas.
 
 ---
 
@@ -224,13 +225,13 @@ produziria. A partir daí, aplicação e rede não distinguem sim de físico.
    [ESP32 real] ── firmware HAL (Strategy) ── monta telemetria v1.1
         │ MQTT/TLS, QoS 1, tópico qualidade-ar/{site}/{device}/telemetria
         ▼
-   [Broker MQTT]  Mosquitto local  ▶ (futuro) AWS IoT Core
+   [Broker MQTT]  Mosquitto local  ▶ AWS IoT Core (perfil mTLS disponível)
         │
         ├──► [Ingestão]  serviço que assina o broker, valida o contrato,
         │                persiste série temporal e expõe API REST + WebSocket
         │                     │
-        │                     ├──► [Dashboard Web]  Next.js (gerencial, para leigos)
-        │                     └──► [App Mobile]     Flutter (mesma API)
+        │                     ├──► [Dashboard/PWA]  web responsiva e instalável
+        │                     └──► [App Flutter]    opcional, se houver requisito nativo
         │
         └──► [Alertas]  regras de limiar → Telegram/e-mail (futuro)
 ```
@@ -238,14 +239,14 @@ produziria. A partir daí, aplicação e rede não distinguem sim de físico.
 - **Broker:** Mosquitto (já pronto em [`infra/server_config`](infra/server_config))
   ou conexão mTLS direta com AWS IoT Core. O sandbox reproduzível está em
   [`infra/aws/`](infra/aws/).
-- **Ingestão:** serviço Node/Fastify (padrão do Painel_UFG) que assina
-  `qualidade-ar/#`, valida com o contrato, grava série temporal e serve os
-  dashboards por REST + WebSocket/SSE (tempo real).
-- **Dashboard Web:** Next.js + Tailwind + TanStack Query (padrão do Painel_UFG),
-  **legível e conduzível por um leigo** (cartões de status por cor, gráficos de
-  tendência, linguagem simples).
-- **App Mobile:** **Flutter**, consumindo a mesma API/WebSocket — telas de
-  status, histórico e alertas.
+- **Ingestão:** serviço Node.js enxuto que assina o tópico de telemetria, valida
+  contrato e tópico, mantém séries limitadas, persiste snapshots atômicos e
+  serve REST, WebSocket, health e métricas Prometheus.
+- **Dashboard/PWA:** aplicação web responsiva, sem dependências em runtime,
+  **legível e conduzível por um leigo**, com cartões, histórico curto, texto
+  além de cor, atualização em tempo real e shell offline.
+- **Mobile:** a PWA é o cliente móvel funcional. Flutter permanece opcional para
+  push em segundo plano, BLE ou integrações nativas futuras.
 
 ---
 
@@ -263,7 +264,7 @@ exigem validação na unidade física.
 | `hal/leitura.h` | `struct Leitura` — o dado unificado que ambas as fontes produzem |
 | `hal/fonte_sensores.h` | interface `FonteSensores` (o Strategy) |
 | `hal/fonte_simulada.{h,cpp}` | lê NDJSON da Serial e preenche `Leitura` |
-| `hal/fonte_fisica.{h,cpp}` | esqueleto de leitura I2C/UART/ADC reais |
+| `hal/fonte_fisica.{h,cpp}` | SHT31, SGP40/VOC, SCD41, PMS7003 e ADC calibrável |
 | `net/publicador_mqtt.{h,cpp}` | publica a `Leitura` como telemetria v1.1 |
 | `main.cpp` | orquestra: escolhe a fonte, lê, monta payload, publica |
 
@@ -272,23 +273,23 @@ A troca sim↔físico é só o `#define MODO_SENSOR` em `config.h`. O `main.cpp`
 
 ---
 
-## 9. Ingestão, dashboard web e app mobile
+## 9. Ingestão, dashboard web e cliente móvel
 
-- **Ingestão + API** — [`dashboard/backend/`](dashboard/backend/): Fastify +
-  série temporal (SQLite/Postgres/Timescale), assina o MQTT, valida contrato,
-  expõe `GET /telemetria`, `GET /dispositivos`, `GET /metricas` e um
-  **WebSocket** de tempo real. Espelha a arquitetura do backend do Painel_UFG
-  (plugins de métricas/segurança, testes, docs).
-- **Dashboard Web** — [`dashboard/web/`](dashboard/web/): Next.js + Tailwind +
-  TanStack Query. Foco em **leigo**: um cartão grande "Ar: BOM / ATENÇÃO /
-  RUIM" por cor, gráficos de tendência (CO₂, PM2.5, VOC), e explicações em
-  linguagem simples ("abra a janela"). Reaproveita o `charts.js` (SVG sem
-  dependências) do IoT-IDEA para um MVP imediato e evolui para componentes React.
-- **App Mobile** — [`mobile/`](mobile/): Flutter consumindo a mesma API +
-  WebSocket. Telas: Agora (status atual), Histórico (gráficos), Alertas.
+- **Ingestão + API** — [`dashboard/backend/`](dashboard/backend/): MQTT, contrato
+  v1.1, deduplicação/lacunas, persistência local limitada, REST, WebSocket,
+  healthcheck e Prometheus. A API está em [`docs/openapi.yaml`](docs/openapi.yaml).
+- **Dashboard/PWA** — [`dashboard/web/`](dashboard/web/): cartões de estado,
+  séries curtas, conectividade, explicações, manifest e service worker. É servido
+  pelo próprio backend e funciona no navegador desktop ou móvel.
+- **Instalação** — [`compose.yaml`](compose.yaml) sobe Mosquitto, backend, painel
+  e gerador de três estações; os scripts em [`scripts/`](scripts/) aguardam a
+  stack ficar pronta antes de retornar sucesso.
+- **App nativo** — [`mobile/`](mobile/) documenta a opção Flutter, sem duplicar a
+  funcionalidade que a PWA já entrega.
 
-Nesta branch, esses três vêm **scaffolded e documentados** (estrutura + README +
-plano de reuso); a implementação completa é a Fase 3 do roadmap.
+Para histórico longo, usuários concorrentes e alta disponibilidade, o próximo
+gate é PostgreSQL/TimescaleDB e autenticação; o snapshot local não se apresenta
+como substituto de um banco de produção.
 
 ---
 
@@ -317,7 +318,7 @@ plano de reuso); a implementação completa é a Fase 3 do roadmap.
 
 | Projeto | O que reaproveitamos |
 |---|---|
-| **Painel_UFG** | Stack e organização do **dashboard web** (Next.js + Tailwind + TanStack Query + Zustand) e do **backend** (Fastify + Prisma/DB + plugins de métricas/segurança/observabilidade), Docker, testes, `docs/` rico. |
+| **Painel_UFG** | Referência de organização, testes, Docker, documentação e caminho futuro para backend/banco e frontend de maior escala. A base atual permaneceu menor para caber na instalação local. |
 | **IoT-IDEA** | Padrão de **firmware** (`#define` de modo, disclaimer de esqueleto, PubSubClient + TLS), **simulador de dispositivo** (argparse, threads, `/metrics`, self-test), **dashboard leve** (`charts.js` SVG sem deps, `config.js` modo auto/live/mock, SSE+polling), e **hardening** de segurança. |
 | **sd-main** | Princípios de **sistemas distribuídos e serialização**: contrato versionado (protobuf), separação plano de controle/dados, **heartbeat**, e a metodologia **benchmark → CSV → gráficos** para as métricas. |
 
@@ -357,13 +358,15 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
 ├── poc/                       PoC de carga (já existente) + contrato v1.1
 │   └── qar_poc/               contrato, sensor, gateway, coordenador, sink...
 │
-├── dashboard/                 ingestão + web (MVP funcional — Fase 2)
-│   ├── backend/src/           Node: assina MQTT, valida v1.1, REST + WebSocket
-│   └── web/public/            painel legível (verdito por cor, cartões, tempo real)
+├── compose.yaml               instalação local completa e persistente
+├── scripts/                   instaladores e configurador do firmware
+├── dashboard/                 ingestão persistente + PWA funcional
+│   ├── backend/src/           MQTT, validação, REST/WS, snapshot e métricas
+│   └── web/public/            painel responsivo, manifest e service worker
 │
-├── mobile/                    (scaffold) app Flutter
+├── mobile/                    roadmap opcional do app Flutter
 │
-├── hardware/                  (scaffold) especificações físicas
+├── hardware/                  especificações e roteiros físicos
 │   ├── pcb/                    shield PCB (barramentos, conectores)
 │   └── case/                   case SolidWorks (especificação paramétrica)
 │
@@ -375,18 +378,16 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
 
 ## 14. Roadmap por fases
 
-- **Fase 0 — Base (esta branch):** blueprint, contrato v1.1, firmware HAL
-  compilável, simulador HIL serial, backend, dashboard e sandbox AWS local. ✅
+- **Fase 0 — Base (esta branch):** contrato v1.1, firmware HAL compilável,
+  simulador, backend persistente, PWA, Compose e IaC AWS. ✅
 - **Fase 1 — HIL de ponta a ponta:** flashar o firmware; `central_
   sensores.py` alimentando o ESP32; ESP32 publicando no Mosquitto; validar com
   o `sink` da PoC.
-- **Fase 2 — Ingestão + Dashboard Web:** **MVP pronto e validado** — backend
-  Node (assina o broker, valida o contrato v1.1, detecta lacunas, série em
-  memória, REST + WebSocket) e painel web legível para leigos (verdito por cor,
-  cartões, sparklines, tempo real) em [`dashboard/`](dashboard/README.md).
-  Evolução: Fastify + Prisma + série temporal + Next.js (padrão Painel_UFG).
-- **Fase 3 — Mobile + Alertas:** app Flutter; alertas Telegram/e-mail; endpoint
-  `/metrics`.
+- **Fase 2 — Ingestão + Dashboard Web:** **pronta e validada** — persistência
+  limitada, REST/WebSocket, health/Prometheus e PWA em
+  [`dashboard/`](dashboard/README.md). Evolução: banco temporal, usuários e HA.
+- **Fase 3 — Produto + Alertas:** regras com histerese/auditoria; Flutter apenas
+  se a PWA não cobrir os requisitos móveis.
 - **Fase 4 — Físico + Nuvem:** montar shield PCB e case; trocar `MODO_SENSOR`
   para físico; migrar o broker para AWS IoT Core (bridge).
 
@@ -404,13 +405,13 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
   AWS, todos compilados com partições OTA para flash de 4 MB.
 - **PoC de carga** continua funcional (agora emitindo v1.1).
 
-- **Dashboard Fase 2 (MVP)** em [`dashboard/`](dashboard/README.md): backend de
-  ingestão (MQTT → validação v1.1 → REST + WebSocket) e painel web legível para
-  leigos (verdito por cor, cartões, sparklines, tempo real). Validado ponta a
-  ponta contra o Mosquitto.
+- **Stack local completa** em [`compose.yaml`](compose.yaml): Mosquitto, gerador,
+  ingestão persistente, REST/WebSocket/Prometheus e PWA, validada inclusive após
+  reinício do backend.
 - **Projeto da PCB** em [`hardware/pcb`](hardware/pcb/README.md): arquitetura,
   pinagem completa, netlist, BOM e a **estratégia de alimentação** (fonte ≥ 1 A,
   bulk no 5 V, e o **divisor de tensão** do MiCS-5524) para o EasyEDA Pro.
 
-Os scaffolds de `mobile/` e `hardware/case/` trazem README com o plano detalhado
-e os pontos de reuso, prontos para as Fases 3–4.
+`mobile/` documenta a evolução nativa opcional. `hardware/case/` e
+`hardware/pcb/` contêm especificações e roadmaps detalhados, mas os arquivos
+nativos dependem das medidas e da revisão nas ferramentas reais.

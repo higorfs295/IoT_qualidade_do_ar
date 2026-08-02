@@ -12,6 +12,50 @@ dashboard web.
 > analógico MiCS publica tensão bruta; `lpg_ppm` só pode ser habilitado depois de
 > calibração rastreável do conjunto físico.
 
+## Instalação recomendada — stack funcional em um comando
+
+Pré-requisito único para a aplicação local: **Docker Desktop/Engine com Docker
+Compose v2**. O instalador cria `.env` sem sobrescrever configurações existentes,
+constrói as imagens, inicia o broker, backend, dashboard e três dispositivos de
+demonstração, e só termina quando dados reais do MQTT aparecem na API.
+
+Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+```
+
+Linux/macOS:
+
+```bash
+sh ./scripts/install.sh
+```
+
+Ou diretamente:
+
+```bash
+cp .env.example .env          # no PowerShell: Copy-Item .env.example .env
+docker compose up -d --build
+```
+
+Abra **http://localhost:3001**. O painel recebe dados MQTT automaticamente e
+pode ser instalado como PWA no computador ou celular. O backend preserva estado,
+séries curtas e contadores no volume `backend_data` entre reinícios.
+
+Comandos operacionais:
+
+```bash
+docker compose ps
+docker compose logs -f backend demo
+docker compose restart
+docker compose down           # preserva os volumes
+docker compose down -v        # apaga conscientemente todos os dados locais
+```
+
+Por padrão MQTT e dashboard ficam vinculados a `127.0.0.1`. Para um ESP32 na
+rede local, altere `BIND_ADDRESS=0.0.0.0` no `.env`, permita apenas a rede local
+no firewall e use o IP do computador como `MQTT_HOST`.
+
 ## Estado da versão final da base
 
 | Parte | Estado verificável | Próximo gate |
@@ -21,8 +65,8 @@ dashboard web.
 | Firmware AWS | TLS/mTLS implementado e compilado | certificado real + IoT Core sandbox |
 | Simulador HIL | implementado; self-test aprovado | teste com porta serial real |
 | Contrato v1.1 | validadores Python/Node e testes aprovados | compatibilidade em bancada |
-| Backend | MVP funcional em memória; teste HTTP aprovado | persistência e autenticação de produção |
-| Dashboard web | MVP funcional, responsivo e com aviso de escopo | histórico/alertas persistentes |
+| Backend | MQTT/API/WS, persistência atômica, healthcheck e métricas | autenticação multiusuário, se exposto |
+| Dashboard web/PWA | funcional, responsivo, instalável e offline | notificações push opcionais |
 | Broker/PoC de carga | configuração e gerador disponíveis | benchmark reproduzido na máquina-alvo |
 | PCB | especificação, BOM, netlist e roteiro completos | esquemático/PCB no EasyEDA + revisão elétrica |
 | Case | roteiro paramétrico completo | medir montagem e modelar no SolidWorks |
@@ -47,15 +91,15 @@ ambiente `esp32-hil` lê quadros do simulador; `esp32-fisico` lê SHT31, SGP40,
 SCD41, PMS7003 e a entrada analógica; `esp32-aws` adiciona TLS/mTLS para o IoT
 Core. Todos geram o mesmo payload v1.1.
 
-## Início rápido: demonstração sem hardware
+## Execução de desenvolvimento sem Docker
 
 Pré-requisitos: Python 3.10+ e Node.js 20+.
 
 ```bash
-# Terminal 1: backend + dashboard (o MQTT pode ficar indisponível nesta demo)
+# Terminal 1: backend + dashboard (persistência opcional com DATA_DIR)
 cd dashboard/backend
 npm ci
-npm start
+MQTT_ENABLED=false DATA_DIR=./data npm start
 
 # Abra http://localhost:3001. Sem dados, o front pode operar em modo mock.
 
@@ -68,7 +112,7 @@ python -m unittest discover -s poc/tests -v
 cd dashboard/backend && npm test
 ```
 
-## Início rápido: fluxo MQTT local
+## Fluxo MQTT manual
 
 ```bash
 # Terminal 1 - broker
@@ -91,10 +135,17 @@ deve ser usado em rede local isolada.
 
 ## Firmware ESP32
 
-1. Copie `firmware/include/secrets.example.h` para
-   `firmware/include/secrets.h` e configure Wi-Fi/broker.
-2. Compile um dos ambientes:
+1. Gere `firmware/include/secrets.h` sem editar C/C++ nem exibir senhas:
 
+```bash
+python scripts/configure_firmware.py --ssid MINHA_REDE \
+  --mqtt-host 192.168.1.10 --device-id esp32-sala-01 --site-id minha-casa
+```
+
+O script pede a senha Wi-Fi sem eco. Para AWS, acrescente `--aws`, porta 8883,
+CA, certificado e chave exclusivos; veja `python scripts/configure_firmware.py --help`.
+
+2. Compile um dos ambientes:
 ```bash
 cd firmware
 pio run -e esp32-hil
@@ -169,6 +220,8 @@ simulador/      central de sensores via Serial/USB
 poc/            gerador de carga e consumidor MQTT em Python
 dashboard/      backend Node e painel web
 infra/          Mosquitto, ThingsBoard e plano de nuvem
+compose.yaml    stack local pronta com persistência e dados de demonstração
+scripts/        instaladores e configurador seguro do firmware
 hardware/pcb/   especificação elétrica/EasyEDA Pro
 hardware/case/  especificação mecânica/SolidWorks
 mobile/         arquitetura do futuro app Flutter
@@ -190,6 +243,7 @@ docs/           contrato, status, testes, roadmaps e artefatos finais
 - [`docs/arquitetura_solucao.pdf`](docs/arquitetura_solucao.pdf) — dossiê técnico diagramado em 10 páginas.
 - [`docs/apresentacao_slides.pdf`](docs/apresentacao_slides.pdf) — apresentação executiva em 12 páginas.
 - [`docs/telemetria-v1.1.schema.json`](docs/telemetria-v1.1.schema.json) — JSON Schema do contrato.
+- [`docs/openapi.yaml`](docs/openapi.yaml) — contrato OpenAPI da API local.
 - [`docs/modelagem_dados.json`](docs/modelagem_dados.json) — modelo lógico para a persistência.
 - [`infra/aws/planejamento_servicos.md`](infra/aws/planejamento_servicos.md) — IoT Core, SQS/DLQ, S3 e DynamoDB.
 - [`ARQUITETURA.md`](ARQUITETURA.md) — histórico detalhado da PoC de ingestão.

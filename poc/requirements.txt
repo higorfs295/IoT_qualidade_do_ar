@@ -3,4 +3,4 @@
 
 # Cliente MQTT usado pelo gerador de carga e pelo consumidor de metricas.
 # A API v2 (CallbackAPIVersion.VERSION2) exige a serie 2.x.
-paho-mqtt>=2.0,<3.0
+paho-mqtt==2.1.0

@@ -1,5 +1,5 @@
 // =============================================================================
-//  server.js — Ingestao MVP (Fase 2)
+//  server.js — servico local de ingestao e consulta
 //  Projeto: Estacao de Qualidade do Ar (base_final)
 // =============================================================================
 //
@@ -7,11 +7,11 @@
 //   1. assina o broker MQTT (qualidade-ar/+/+/telemetria);
 //   2. VALIDA cada mensagem contra o contrato v1.1 (contrato.js);
 //   3. deduplica por message_id e DETECTA LACUNAS por sequence;
-//   4. guarda a serie temporal (em memoria) e o estado atual por dispositivo;
+//   4. guarda a serie temporal limitada e persiste snapshots atomicos;
 //   5. serve REST + WebSocket (tempo real) + o dashboard estatico.
 //
-//  Armazenamento: em memoria (ring buffer). Evolucao: SQLite/TimescaleDB (ver
-//  dashboard/backend/README.md). Sem dependencia de banco para o MVP rodar.
+//  Armazenamento local: ring buffers limitados + snapshot JSON atomico. Um banco
+//  temporal continua recomendado para retencao longa, concorrencia ou HA.
 //
 //  Variaveis de ambiente:
 //   MQTT_URL   (padrao mqtt://localhost:1883)   PORT (padrao 3001)
@@ -26,23 +26,29 @@ import path from "node:path";
 import mqtt from "mqtt";
 import { WebSocketServer } from "ws";
 import { validarContrato, validarTopico } from "./contrato.js";
+import { carregarSnapshot, criarSnapshot, salvarSnapshot } from "./persistence.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.resolve(__dirname, "../../web/public");
 
 const MQTT_URL = process.env.MQTT_URL || "mqtt://localhost:1883";
+const MQTT_ENABLED = process.env.MQTT_ENABLED !== "false";
 function inteiroPositivo(valor, padrao, maximo) {
   const n = Number(valor);
   return Number.isInteger(n) && n > 0 && n <= maximo ? n : padrao;
 }
 
 const PORT = inteiroPositivo(process.env.PORT, 3001, 65535);
+const HOST = process.env.HOST || "0.0.0.0";
 const SERIE_MAX = inteiroPositivo(process.env.SERIE_MAX, 500, 100000);
 const BODY_MAX = inteiroPositivo(process.env.BODY_MAX, 65536, 1048576);
 const IDS_MAX = inteiroPositivo(process.env.IDS_MAX, 200000, 2000000);
 const DEVICES_MAX = inteiroPositivo(process.env.DEVICES_MAX, 10000, 1000000);
 const ONLINE_TIMEOUT_MS = inteiroPositivo(process.env.ONLINE_TIMEOUT_MS, 120000, 86400000);
 const HTTP_INGEST_TOKEN = process.env.HTTP_INGEST_TOKEN || "";
+const DATA_DIR = process.env.DATA_DIR || "";
+const STATE_FILE = process.env.STATE_FILE || (DATA_DIR ? path.join(DATA_DIR, "state.json") : "");
+const PERSIST_INTERVAL_MS = inteiroPositivo(process.env.PERSIST_INTERVAL_MS, 5000, 3600000);
 const HTTP_INGEST_ENABLED = process.env.ENABLE_HTTP_INGEST === "true" ||
   (process.env.NODE_ENV !== "production" && process.env.ENABLE_HTTP_INGEST !== "false");
 
@@ -53,6 +59,58 @@ const metricas = {
   recebidas: 0, invalidas: 0, lacunas: 0, duplicadas: 0,
   reordenadas: 0, reinicios: 0, inicio: Date.now(),
 };
+const limitesPersistencia = { serieMax: SERIE_MAX, idsMax: IDS_MAX, devicesMax: DEVICES_MAX };
+let persistenciaSuja = false;
+let tarefaPersistencia = null;
+let ultimoPersistidoEm = null;
+let erroPersistencia = null;
+
+function marcarPersistencia() { if (STATE_FILE) persistenciaSuja = true; }
+
+async function restaurarPersistencia() {
+  if (!STATE_FILE) return;
+  try {
+    const salvo = await carregarSnapshot(STATE_FILE, limitesPersistencia);
+    if (!salvo) return;
+    for (const [id, d] of salvo.dispositivos) dispositivos.set(id, d);
+    for (const [id, instante] of salvo.idsVistos) idsVistos.set(id, instante);
+    Object.assign(metricas, salvo.metricas, { inicio: Date.now() });
+    console.log(`[persistencia] restaurados ${dispositivos.size} dispositivo(s)`);
+  } catch (erro) {
+    erroPersistencia = erro.message;
+    console.error(`[persistencia] estado ignorado: ${erro.message}`);
+  }
+}
+
+async function persistirAgora(forcar = false) {
+  if (!STATE_FILE) return;
+  if (tarefaPersistencia) {
+    await tarefaPersistencia;
+    if (forcar && persistenciaSuja) return persistirAgora(true);
+    return;
+  }
+  if (!persistenciaSuja && !forcar) return;
+  persistenciaSuja = false;
+  tarefaPersistencia = (async () => {
+    try {
+      const snapshot = criarSnapshot(dispositivos, idsVistos, metricas, limitesPersistencia);
+      await salvarSnapshot(STATE_FILE, snapshot);
+      ultimoPersistidoEm = snapshot.saved_at;
+      erroPersistencia = null;
+    } catch (erro) {
+      persistenciaSuja = true;
+      erroPersistencia = erro.message;
+      console.error(`[persistencia] falha ao salvar: ${erro.message}`);
+    }
+  })();
+  await tarefaPersistencia;
+  tarefaPersistencia = null;
+}
+
+await restaurarPersistencia();
+const timerPersistencia = STATE_FILE
+  ? setInterval(() => { void persistirAgora(); }, PERSIST_INTERVAL_MS)
+  : null;
 
 function idDuplicado(messageId) {
   if (idsVistos.has(messageId)) {
@@ -74,6 +132,7 @@ function idDuplicado(messageId) {
 
 function ingerir(msg, origem, topico = null) {
   metricas.recebidas++;
+  marcarPersistencia();
   const erro = validarContrato(msg) || (topico ? validarTopico(topico, msg) : null);
   if (erro) { metricas.invalidas++; return { ok: false, erro }; }
 
@@ -123,7 +182,8 @@ function online(d) { return Date.now() - d.ultimoVistoMs < ONLINE_TIMEOUT_MS; }
 
 // --- HTTP + REST -------------------------------------------------------------
 const TIPOS = { ".html": "text/html; charset=utf-8", ".css": "text/css",
-  ".js": "text/javascript", ".svg": "image/svg+xml", ".json": "application/json" };
+  ".js": "text/javascript", ".svg": "image/svg+xml", ".json": "application/json",
+  ".webmanifest": "application/manifest+json" };
 
 function json(res, code, obj) {
   const s = JSON.stringify(obj);
@@ -159,6 +219,19 @@ const servidor = http.createServer(async (req, res) => {
   const p = url.pathname;
 
   // --- API ---
+  if (p === "/api/health") {
+    return json(res, 200, {
+      ok: true,
+      ready: !MQTT_ENABLED || mqttConectado,
+      mqtt_enabled: MQTT_ENABLED,
+      mqtt_connected: mqttConectado,
+      persistence_enabled: Boolean(STATE_FILE),
+      persistence_last_saved_at: ultimoPersistidoEm,
+      persistence_error: erroPersistencia,
+      devices: dispositivos.size,
+      uptime_s: Math.round((Date.now() - metricas.inicio) / 1000),
+    });
+  }
   if (p === "/api/dispositivos") {
     const lista = [...dispositivos.entries()].map(([id, d]) => ({
       device_id: id, site_id: d.site_id, online: online(d), ultimo: d.ultimo,
@@ -187,6 +260,30 @@ const servidor = http.createServer(async (req, res) => {
       uptime_s: Math.round((Date.now() - metricas.inicio) / 1000),
     });
   }
+  if (p === "/metrics") {
+    const linhas = [
+      "# HELP qar_messages_received_total Mensagens recebidas pelo backend.",
+      "# TYPE qar_messages_received_total counter",
+      `qar_messages_received_total ${metricas.recebidas}`,
+      "# TYPE qar_messages_invalid_total counter",
+      `qar_messages_invalid_total ${metricas.invalidas}`,
+      "# TYPE qar_messages_duplicate_total counter",
+      `qar_messages_duplicate_total ${metricas.duplicadas}`,
+      "# TYPE qar_sequence_gaps_total counter",
+      `qar_sequence_gaps_total ${metricas.lacunas}`,
+      "# TYPE qar_devices gauge",
+      `qar_devices ${dispositivos.size}`,
+      "# TYPE qar_devices_online gauge",
+      `qar_devices_online ${[...dispositivos.values()].filter(online).length}`,
+      "# TYPE qar_mqtt_connected gauge",
+      `qar_mqtt_connected ${mqttConectado ? 1 : 0}`,
+      "# TYPE qar_persistence_error gauge",
+      `qar_persistence_error ${erroPersistencia ? 1 : 0}`,
+      "",
+    ];
+    res.writeHead(200, { "content-type": "text/plain; version=0.0.4; charset=utf-8", "cache-control": "no-store" });
+    return res.end(linhas.join("\n"));
+  }
   // Ingestao por HTTP (para teste/dev sem broker; mesmo caminho do MQTT).
   if (p === "/api/ingest" && req.method === "POST") {
     if (!HTTP_INGEST_ENABLED) return json(res, 404, { erro: "ingestao HTTP desabilitada" });
@@ -203,13 +300,17 @@ const servidor = http.createServer(async (req, res) => {
       if (Buffer.byteLength(corpo) > BODY_MAX) {
         excedeu = true;
         corpo = "";
+        metricas.recebidas++; metricas.invalidas++; marcarPersistencia();
         json(res, 413, { ok: false, erro: "payload excede o limite" });
       }
     });
     req.on("end", () => {
       if (excedeu) return;
       try { return json(res, 200, ingerir(JSON.parse(corpo), "http")); }
-      catch { return json(res, 400, { ok: false, erro: "json invalido" }); }
+      catch {
+        metricas.recebidas++; metricas.invalidas++; marcarPersistencia();
+        return json(res, 400, { ok: false, erro: "json invalido" });
+      }
     });
     return;
   }
@@ -229,9 +330,14 @@ wss.on("connection", (ws) => {
 });
 
 // --- MQTT --------------------------------------------------------------------
+let mqttConectado = false;
+let clienteMqtt = null;
+
 function conectarMqtt() {
   const cli = mqtt.connect(MQTT_URL, { reconnectPeriod: 3000 });
+  clienteMqtt = cli;
   cli.on("connect", () => {
+    mqttConectado = true;
     console.log(`[mqtt] conectado em ${MQTT_URL}`);
     const filtro = "qualidade-ar/+/+/telemetria";
     cli.subscribe(filtro, { qos: 1 }, (e) =>
@@ -239,18 +345,37 @@ function conectarMqtt() {
   });
   cli.on("message", (topico, payload) => {
     try { ingerir(JSON.parse(payload.toString()), "mqtt", topico); }
-    catch { metricas.recebidas++; metricas.invalidas++; }
+    catch { metricas.recebidas++; metricas.invalidas++; marcarPersistencia(); }
   });
+  cli.on("close", () => { mqttConectado = false; });
+  cli.on("offline", () => { mqttConectado = false; });
   cli.on("error", (e) => console.log(`[mqtt] erro: ${e.message}`));
 }
 
-servidor.listen(PORT, () => {
+servidor.listen(PORT, HOST, () => {
   console.log("=".repeat(60));
-  console.log(" Ingestao MVP — Estacao de Qualidade do Ar (Fase 2)");
+  console.log(" Ingestao local — Estacao de Qualidade do Ar");
   console.log("=".repeat(60));
   console.log(`  dashboard .... http://localhost:${PORT}`);
   console.log(`  API .......... http://localhost:${PORT}/api/metricas`);
-  console.log(`  broker MQTT .. ${MQTT_URL}`);
+  console.log(`  broker MQTT .. ${MQTT_ENABLED ? MQTT_URL : "desabilitado"}`);
+  console.log(`  persistencia . ${STATE_FILE || "desabilitada"}`);
   console.log("=".repeat(60));
-  conectarMqtt();
+  if (MQTT_ENABLED) conectarMqtt();
 });
+
+let encerrando = false;
+async function encerrar(sinal) {
+  if (encerrando) return;
+  encerrando = true;
+  console.log(`[sistema] ${sinal}; encerrando com persistencia...`);
+  if (timerPersistencia) clearInterval(timerPersistencia);
+  await persistirAgora(true);
+  if (clienteMqtt) clienteMqtt.end(true);
+  wss.close();
+  servidor.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 5000).unref();
+}
+
+process.on("SIGTERM", () => { void encerrar("SIGTERM"); });
+process.on("SIGINT", () => { void encerrar("SIGINT"); });

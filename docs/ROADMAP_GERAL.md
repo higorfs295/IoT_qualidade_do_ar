@@ -1,107 +1,112 @@
 # Roadmap geral orientado por gates
 
-O projeto deve avançar por evidência, não apenas por calendário. Uma fase só
-fecha quando seus critérios de saída estão registrados.
+O projeto avança por evidência. A base local e os artefatos de desenvolvimento
+estão prontos; fabricação, calibração e nuvem real continuam condicionadas aos
+recursos físicos e às credenciais do proprietário.
 
-## Fase 0 — congelar a base de desenvolvimento
+## Fase 0 — base reprodutível: concluída
 
-Objetivo: qualquer integrante reproduz os testes.
+- [x] Stack local com um pré-requisito: Docker Compose.
+- [x] `.env.example`, segredos ignorados e configurador seguro do firmware.
+- [x] Testes Python/Node, CI e builds HIL/físico/AWS.
+- [x] Persistência, PWA, healthchecks, OpenAPI e métricas.
+- [ ] Confirmar no módulo real 4 MB, variante, pinout de 30 pinos e se o segundo
+  `VIN` é `VN/GPIO39`.
 
-- [ ] Instalar Python 3.10+, Node 20+, PlatformIO e Docker Compose v2.
-- [ ] Copiar os arquivos `.env.example`/`secrets.example.h`, sem versionar segredos.
-- [ ] Executar testes Python/Node e builds HIL/físico/AWS.
-- [ ] Confirmar no módulo real: 4 MB de flash, variante ESP-WROOM-32, pinout de
-  30 pinos e se o segundo rótulo `VIN` é, na verdade, `VN/GPIO39`.
-- [ ] Registrar versões de ferramentas e hash do commit no relatório de ensaio.
+Saída de software cumprida: Compose construído e testado com restauração após
+reinício. A última pendência desta fase é uma identificação física da placa.
 
-Saída: todos os comandos do README passam em uma segunda máquina.
+## Fase 1 — integração HIL com ESP32 real
 
-## Fase 1 — integração HIL ponta a ponta
-
-- [ ] Subir Mosquitto e backend.
-- [ ] Gravar `esp32-hil` no ESP32.
-- [ ] Enviar `normal`, `pico_poluicao`, `incendio` e `vazamento_glp` pela USB.
+- [ ] Executar `scripts/install.ps1` ou `scripts/install.sh`.
+- [ ] Gerar `secrets.h`, gravar `esp32-hil` e ligar a UART USB.
+- [ ] Enviar `normal`, `pico_poluicao`, `incendio` e `vazamento_glp`.
 - [ ] Confirmar ULID, sequência, `boot_id`, QoS 1, timestamps e WebSocket.
-- [ ] Parar o simulador por mais de 20 s e confirmar `ERROR/UNKNOWN`.
-- [ ] Derrubar Wi-Fi/broker e medir reconexão e perda.
+- [ ] Parar a central por mais que o timeout e confirmar degradação explícita.
+- [ ] Derrubar Wi-Fi/broker e medir reconexão, lacunas e heap mínimo.
 
-Saída: relatório com capturas, payloads e nenhuma divergência de contrato.
+Saída: relatório com payloads e nenhuma divergência de contrato.
 
 ## Fase 2 — protótipo em bancada sem PCB
 
-- [ ] Comprar módulos e confirmar datasheets/pinouts exatos.
-- [ ] Testar fonte 5 V com carga eletrônica antes de conectar o ESP32.
-- [ ] Ligar um sensor por vez em protoboard/chicote curto.
-- [ ] Rodar I2C scanner, frames PMS e tensão ADC.
+- [ ] Comprar módulos e guardar datasheets/pinouts exatos.
+- [ ] Testar a fonte 5 V com carga antes de conectar o ESP32.
+- [ ] Ligar um sensor por vez em protoboard ou chicote curto.
+- [ ] Rodar scanner I²C, inspecionar frames PMS e medir tensão ADC.
 - [ ] Comparar temperatura/umidade, CO₂ e PM com referências.
-- [ ] Registrar aquecimento, tempo de estabilização e falhas.
+- [ ] Registrar aquecimento, estabilização, corrente e falhas.
 
 Saída: cada sensor tem ficha de aceite; nenhuma conversão ppm é presumida.
 
-## Fase 3 — esquemático e PCB Rev A
+## Fase 3 — esquemático e PCB Rev A no EasyEDA Pro
 
-Seguir [`ROADMAP_HARDWARE_EASYEDA.md`](ROADMAP_HARDWARE_EASYEDA.md).
+Procedimento completo: [`ROADMAP_HARDWARE_EASYEDA.md`](ROADMAP_HARDWARE_EASYEDA.md).
 
-- [ ] Medir o DevKit e conectores reais.
-- [ ] Fechar arquitetura de alimentação sem backfeed USB e registrar a posição
-  de `JP1` para modo USB ou modo autônomo.
-- [ ] Criar/revisar símbolos e footprints.
-- [ ] ERC, revisão por pares, layout, DRC e Gerbers.
-- [ ] Fabricar poucas unidades e executar bring-up com fonte limitada.
+- [ ] Medir DevKit, módulos e conectores comprados.
+- [ ] Confirmar pinos, straps, níveis lógicos e orçamento de corrente.
+- [ ] Fechar alimentação sem backfeed USB e posição segura de `JP1`.
+- [ ] Criar/revisar símbolos e footprints vinculados à BOM.
+- [ ] Executar ERC, revisão por pares, placement, roteamento e DRC.
+- [ ] Exportar Gerbers/Drill/BOM/Pick-and-Place e revisar no visualizador.
+- [ ] Fabricar poucas unidades e fazer bring-up com fonte limitada.
 
-Saída: uma Rev A funcional e uma lista de correções para Rev B.
+Saída: Rev A funcional, pacote de fabricação arquivado e correções da Rev B.
 
-## Fase 4 — case e ensaio térmico/fluxo
+## Fase 4 — case no SolidWorks
 
-Seguir [`ROADMAP_CASE_SOLIDWORKS.md`](ROADMAP_CASE_SOLIDWORKS.md).
+Procedimento completo: [`ROADMAP_CASE_SOLIDWORKS.md`](ROADMAP_CASE_SOLIDWORKS.md).
 
-- [ ] Modelar envelopes medidos, dutos e câmaras separadas.
-- [ ] Verificar interferências e acesso à manutenção.
-- [ ] Imprimir protótipo, instalar termopares e comparar com caixa aberta.
-- [ ] Corrigir recirculação do PMS e viés térmico do SHT31.
+- [ ] Modelar envelopes medidos e PCB Rev A congelada.
+- [ ] Separar câmaras térmicas e fluxos; impedir recirculação do PMS.
+- [ ] Verificar interferências, fixação, USB, botões e manutenção.
+- [ ] Produzir conjunto, desenho cotado, STL/3MF e STEP.
+- [ ] Imprimir protótipo e comparar temperaturas com caixa aberta.
+- [ ] Corrigir viés do SHT31, ruído, entrada de poeira e montagem.
 
-Saída: STL revisado, desenho cotado e fotos da montagem.
+Saída: case revisado com arquivos nativos e evidência de ensaio.
 
-## Fase 5 — software persistente e produto de demonstração
+## Fase 5 — produto de demonstração prolongada
 
-- [ ] PostgreSQL/TimescaleDB, migrações e retenção.
+A demonstração local curta já possui persistência e PWA. Para operar por dias ou
+com múltiplos usuários:
+
+- [ ] PostgreSQL/TimescaleDB, migrações, retenção e backup/restauração.
 - [ ] Autenticação, autorização, TLS e gestão de dispositivos.
-- [ ] Histórico, alertas com histerese e auditoria.
-- [ ] Flutter com as mesmas regras/contrato, sem duplicar limiares.
-- [ ] Observabilidade e backup/restauração testados.
+- [ ] Alertas com histerese, auditoria e validação de falsos alarmes.
+- [ ] Observabilidade externa e soak de 7 dias.
+- [ ] Flutter somente se um requisito nativo não for coberto pela PWA.
 
 Saída: release demonstrável por 7 dias sem intervenção manual.
 
-## Fase 6 — sandbox AWS e operação de frota
+## Fase 6 — sandbox AWS e frota
 
-- [ ] Aplicar o template de [`../infra/aws/`](../infra/aws/) em conta sandbox.
-- [ ] Criar um Thing/certificado por unidade e anexar política de menor privilégio.
-- [ ] Gravar `esp32-aws`, validar mTLS, QoS 1, SQS/DLQ, S3 e estado idempotente.
-- [ ] Exercitar expiração/revogação de certificado, reprocessamento da DLQ e
-  alarmes de custo antes de aumentar a frota.
-- [ ] Definir provisioning em escala e OTA; a tabela de partições já suporta
-  duas imagens, mas o cliente de atualização ainda deve ser implementado.
+- [ ] Criar orçamento e alarmes de custo.
+- [ ] Aplicar [`../infra/aws/`](../infra/aws/) em conta sandbox.
+- [ ] Criar Thing/certificado por unidade e anexar menor privilégio.
+- [ ] Gravar `esp32-aws`; validar mTLS, IoT Rule, SQS/DLQ, S3 e DynamoDB.
+- [ ] Exercitar revogação, reprocessamento, logs e teardown.
+- [ ] Implementar OTA assinada; a partição já possui dois slots, mas o cliente de
+  atualização ainda não faz parte desta base.
 
-Saída: uma unidade opera no sandbox sem segredo no repositório e com recuperação
-documentada de falhas.
+Saída: uma unidade opera sem segredo no repositório e com recuperação ensaiada.
 
-## Fase 7 — piloto e revisão final
+## Fase 7 — piloto e Rev B
 
-- [ ] Instalar em local controlado, com consentimento e aviso de protótipo.
-- [ ] Operar 30 dias, acompanhar drift, disponibilidade e falsos alertas.
+- [ ] Instalar em local controlado, com aviso de protótipo.
+- [ ] Operar 30 dias e acompanhar drift, disponibilidade e falsos alertas.
 - [ ] Revisar ameaças, consumo, manutenção e custo total.
-- [ ] Atualizar BOM, firmware, case e documentação para Rev B.
+- [ ] Atualizar BOM, firmware, PCB, case e documentação.
 
-Saída: decisão documentada de continuar, reprojetar ou encerrar o piloto.
+Saída: decisão registrada de continuar, reprojetar ou encerrar.
 
-## Dependências críticas
+## Caminho crítico
 
 ```text
-HIL validado -> bancada por sensor -> esquemático -> PCB Rev A -> case medido
-      |                                  |              |
-      +-> backend persistente -----------+--------------+-> piloto
+stack local -> HIL no ESP32 -> bancada por sensor -> PCB Rev A -> case medido
+                     |                |                 |
+                     +-> persistência longa/AWS --------+-> piloto
 ```
 
-Não modele o case final antes de congelar PCB/conectores. Não fabrique PCB antes
-de confirmar pinout e corrente dos módulos comprados. Não habilite alertas de
-segurança antes de calibração, ensaios e definição formal do uso pretendido.
+Não modele o case final antes de congelar PCB e conectores. Não fabrique PCB
+antes de confirmar pinout e corrente dos módulos. Não habilite alertas de
+segurança antes de calibração e definição formal do uso pretendido.

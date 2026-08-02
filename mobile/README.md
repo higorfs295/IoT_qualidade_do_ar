@@ -1,10 +1,16 @@
-# Mobile — App Flutter (planejado)
+# Mobile — PWA funcional e Flutter opcional
+
+O caminho mobile utilizável agora é a PWA em [`../dashboard/web`](../dashboard/web):
+abra o dashboard pelo navegador do celular e escolha **Instalar app**. Ela usa a
+mesma API/WebSocket, possui shell offline e não exige uma segunda base de código.
+
+## Aplicativo Flutter futuro
 
 Aplicativo mobile em **Flutter**, consumindo a **mesma API + WebSocket** do
 [`../dashboard/backend`](../dashboard/backend) — paridade total com o web.
 
-> Status nesta branch: **scaffold documentado**. Implementação na Fase 3 do
-> roadmap em [`../BASE_FINAL.md`](../BASE_FINAL.md).
+> Status: a PWA está implementada; Flutter permanece opcional para notificações
+> nativas, distribuição em lojas e integrações específicas de Android/iOS.
 
 Plano executável e gates: [`../docs/ROADMAP_SOFTWARE.md`](../docs/ROADMAP_SOFTWARE.md).
 

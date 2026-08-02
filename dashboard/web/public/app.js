@@ -20,6 +20,17 @@
   var dispositivoAtual = null;
   var metricasTimer = null;
   var reconectarTimer = null;
+  var eventoInstalacao = null;
+
+  window.addEventListener("beforeinstallprompt", function (ev) {
+    ev.preventDefault();
+    eventoInstalacao = ev;
+    document.getElementById("installApp").hidden = false;
+  });
+  window.addEventListener("appinstalled", function () {
+    eventoInstalacao = null;
+    document.getElementById("installApp").hidden = true;
+  });
 
   function nivel(k, v, lim) {
     if (v == null) return "neutro";
@@ -186,6 +197,19 @@
     fetch(BASE + "/api/metricas", { signal: AbortSignal.timeout(1500) })
       .then(function (r) { if (!r.ok) throw 0; return iniciarLive(); })
       .catch(function () { iniciarMock(); });
+  }
+  document.getElementById("installApp").addEventListener("click", function () {
+    if (!eventoInstalacao) return;
+    eventoInstalacao.prompt();
+    eventoInstalacao.userChoice.finally(function () {
+      eventoInstalacao = null;
+      document.getElementById("installApp").hidden = true;
+    });
+  });
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("/sw.js").catch(function () {});
+    });
   }
   iniciar();
 })();

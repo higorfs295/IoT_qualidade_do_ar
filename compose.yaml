@@ -1,0 +1,111 @@
+name: qar
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    restart: unless-stopped
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${MQTT_PORT:-1883}:1883"
+    volumes:
+      - ./infra/server_config/mosquitto/config:/mosquitto/config:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h 127.0.0.1 -p 1883 -t healthcheck/ping -m ok || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 5s
+    networks: [qar-net]
+
+  backend:
+    build:
+      context: ./dashboard
+      dockerfile: backend/Dockerfile
+    image: qar-backend:local
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_ENABLED: "true"
+      DATA_DIR: /data
+      PERSIST_INTERVAL_MS: ${PERSIST_INTERVAL_MS:-5000}
+      SERIE_MAX: ${SERIE_MAX:-2000}
+      DEVICES_MAX: ${DEVICES_MAX:-1000}
+      IDS_MAX: ${IDS_MAX:-50000}
+      ONLINE_TIMEOUT_MS: ${ONLINE_TIMEOUT_MS:-120000}
+      ENABLE_HTTP_INGEST: "false"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${DASHBOARD_PORT:-3001}:3001"
+    volumes:
+      - backend_data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then(r=>r.json()).then(j=>{if(!j.ready)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 10s
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [qar-net]
+
+  demo:
+    build:
+      context: ./poc
+      dockerfile: Dockerfile
+    image: qar-poc:local
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    command:
+      - ingestao_teste.py
+      - --host
+      - mosquitto
+      - --porta
+      - "1883"
+      - --sensores
+      - "${DEMO_DEVICES:-3}"
+      - --gateways
+      - "1"
+      - --intervalo
+      - "${DEMO_INTERVAL_SECONDS:-5}"
+      - --duracao
+      - "0"
+      - --periodo-reporte
+      - "30"
+      - --prob-degradar
+      - "0.03"
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [qar-net]
+
+  sink:
+    build:
+      context: ./poc
+      dockerfile: Dockerfile
+    image: qar-poc:local
+    profiles: [diagnostico]
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    command: ["consumidor_metricas.py", "--host", "mosquitto", "--porta", "1883", "--qos", "1", "--periodo-reporte", "5"]
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [qar-net]
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  backend_data:
+
+networks:
+  qar-net:
+    driver: bridge

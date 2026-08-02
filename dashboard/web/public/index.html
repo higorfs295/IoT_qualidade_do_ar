@@ -4,12 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Qualidade do Ar — Painel</title>
+  <meta name="theme-color" content="#12324a" />
+  <meta name="description" content="Painel local da estação IoT de qualidade do ar" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <header class="topo">
     <div class="marca">🌬️ <strong>Qualidade do Ar</strong></div>
     <div class="controles">
+      <button id="installApp" type="button" hidden>Instalar app</button>
       <select id="seletorDispositivo" title="Dispositivo"></select>
       <span id="conexao" class="conexao off">conectando…</span>
     </div>
