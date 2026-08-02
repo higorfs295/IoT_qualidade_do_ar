@@ -121,9 +121,10 @@ cd ../mobile && flutter analyze && flutter test
 
 - APK: `21862DAFDF4EFD277AB36C81C2FE8853D521FFA9F57D04D9B3A72726A03ADCEC`
 - Lambda ZIP: `7ED1D4E4F27A4076C5132EEF4FB4809967928B2FCD3B4423C4BCF0299650A40D`
-- PPTX: `4659CD42326661B826256B01B68C2BEAD3938AA710FF84FF8191517B588D7D42`
+- PPTX: `22CDD8F708BD138F99F33A5BB56D7E4A6FA35F02D0763F3CB1F730CFE935E607`
 - PDF de arquitetura: `4AD7E0371744DF924934244EE3DA276652E7D70312C6393B00046AAEBBAE05F2`
 - PDF de slides resumidos: `66714FF6968DD085D20B6C696E705E886C0136177DA0EC97B15A7C491A4CDD32`
 
-A apresentação possui 16 slides editáveis, notas com fontes, renderização
-integral aprovada, zero overflow e fidelidade ao template aprovada.
+A apresentação possui 11 slides editáveis em 4:3, segue a sequência do modelo
+da disciplina, mantém a identidade visual azul, inclui notas com fontes e teve
+renderização integral, zero overflow e fidelidade ao template aprovados.
