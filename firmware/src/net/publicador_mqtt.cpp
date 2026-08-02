@@ -9,6 +9,7 @@
 #include <esp_system.h>
 #include <sys/time.h>
 #include <time.h>
+#include <cstring>
 
 #ifdef MQTT_TLS
 #include <WiFiClientSecure.h>
@@ -129,12 +130,41 @@ void PublicadorMqtt::manter() {
   }
   if (!mqtt.connected()) conectarBroker();
   mqtt.loop();
+  descarregarFila();
 }
 
 bool PublicadorMqtt::conectado() { return mqtt.connected(); }
 
+bool PublicadorMqtt::enfileirar(const char* dados, size_t tamanho) {
+  if (tamanho == 0 || tamanho >= MQTT_PAYLOAD_MAX) return false;
+  if (_filaQuantidade == MQTT_OFFLINE_QUEUE_SIZE) {
+    _filaInicio = (_filaInicio + 1) % MQTT_OFFLINE_QUEUE_SIZE;
+    _filaQuantidade--;
+    _filaDescartadas++;
+  }
+  const uint8_t indice = (_filaInicio + _filaQuantidade) % MQTT_OFFLINE_QUEUE_SIZE;
+  memcpy(_fila[indice].payload, dados, tamanho);
+  _fila[indice].payload[tamanho] = '\0';
+  _fila[indice].tamanho = static_cast<uint16_t>(tamanho);
+  _filaQuantidade++;
+  return true;
+}
+
+void PublicadorMqtt::descarregarFila() {
+  if (!mqtt.connected() || _filaQuantidade == 0) return;
+  char topico[MQTT_TOPIC_MAX];
+  if (!montarTopico(topico, sizeof(topico), SITE_ID, DEVICE_ID)) return;
+  MensagemPendente& item = _fila[_filaInicio];
+  if (!mqtt.publish(topico, item.payload, item.tamanho, false, MQTT_QOS)) return;
+  item.tamanho = 0;
+  _filaInicio = (_filaInicio + 1) % MQTT_OFFLINE_QUEUE_SIZE;
+  _filaQuantidade--;
+}
+
 bool PublicadorMqtt::publicar(const Leitura& l) {
-  if (!mqtt.connected() || !relogioValido()) return false;
+  // Sem relogio confiavel nao existe sent_at/ULID valido. Depois do primeiro
+  // NTP, a fila pode preservar amostras mesmo durante uma queda do broker.
+  if (!relogioValido()) return false;
   if (ESP.getFreeHeap() < MIN_FREE_HEAP_BYTES) {
     Serial.printf("[erro] heap insuficiente para publicar: %u bytes\n", ESP.getFreeHeap());
     return false;
@@ -151,7 +181,8 @@ bool PublicadorMqtt::publicar(const Leitura& l) {
   char sentAt[21];
   agoraRfc3339(sentAt);
   doc["sent_at"] = sentAt;
-  doc["sequence"] = ++_sequence;
+  const uint32_t proximaSequence = _sequence + 1;
+  doc["sequence"] = proximaSequence;
 
   JsonObject m = doc["measurements"].to<JsonObject>();
   if (l.co2_ok) m["co2_ppm"] = l.co2_ppm; else m["co2_ppm"] = nullptr;
@@ -194,11 +225,23 @@ bool PublicadorMqtt::publicar(const Leitura& l) {
   meta["max_alloc_heap_bytes"] = ESP.getMaxAllocHeap();
   meta["uptime_s"] = millis() / 1000UL;
   meta["reset_reason"] = static_cast<int>(esp_reset_reason());
+  meta["offline_queue_depth"] = _filaQuantidade;
+  meta["offline_dropped_total"] = _filaDescartadas;
 
   if (doc.overflowed() || measureJson(doc) >= sizeof(payload)) return false;
   size_t n = serializeJson(doc, payload, sizeof(payload));
   if (n == 0 || n >= sizeof(payload)) return false;
   char topico[MQTT_TOPIC_MAX];
   if (!montarTopico(topico, sizeof(topico), SITE_ID, DEVICE_ID)) return false;
-  return mqtt.publish(topico, payload, static_cast<int>(n), false, MQTT_QOS);
+
+  bool aceito = false;
+  // Se ja existem mensagens pendentes, preserva a ordem e anexa a nova.
+  if (_filaQuantidade > 0 || !mqtt.connected()) {
+    aceito = enfileirar(payload, n);
+  } else {
+    aceito = mqtt.publish(topico, payload, static_cast<int>(n), false, MQTT_QOS);
+    if (!aceito) aceito = enfileirar(payload, n);
+  }
+  if (aceito) _sequence = proximaSequence;
+  return aceito;
 }

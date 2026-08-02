@@ -1,14 +1,23 @@
 openapi: 3.1.0
 info:
   title: API da Estação IoT de Qualidade do Ar
-  version: 1.0.0
-  description: API local do backend MQTT, persistência e dashboard.
+  version: 1.1.0
+  description: API local do backend MQTT, persistência, dashboard e app mobile.
 servers:
   - url: http://localhost:3001
 paths:
+  /api/info:
+    get:
+      summary: Descobre versão, contratos e capacidades da API
+      responses:
+        "200":
+          description: Capacidades suportadas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiInfo" }
   /api/health:
     get:
-      summary: Estado do processo, MQTT e persistência
+      summary: Estado do processo, MQTT, assinatura e persistência
       responses:
         "200":
           description: Processo ativo
@@ -38,7 +47,7 @@ paths:
       summary: Lista os dispositivos conhecidos e o último estado
       responses:
         "200":
-          description: Dispositivos
+          description: Dispositivos ordenados por identificador
           content:
             application/json:
               schema:
@@ -51,10 +60,11 @@ paths:
         - $ref: "#/components/parameters/DeviceId"
       responses:
         "200":
-          description: Telemetria v1.1
+          description: Telemetria v1.0 ou v1.1
           content:
             application/json:
               schema: { $ref: "./telemetria-v1.1.schema.json" }
+        "400": { description: Identificador malformado }
         "404": { description: Dispositivo desconhecido }
   /api/dispositivos/{device_id}/serie:
     get:
@@ -63,7 +73,10 @@ paths:
         - $ref: "#/components/parameters/DeviceId"
         - name: campo
           in: query
-          schema: { type: string, default: co2_ppm }
+          schema:
+            type: string
+            default: co2_ppm
+            enum: [co2_ppm, gas_raw_v, humidity_pct, lpg_ppm, pm1_ugm3, pm25_ugm3, pm10_ugm3, temperature_c, tvoc_ppb, voc_index]
         - name: n
           in: query
           schema: { type: integer, minimum: 1, default: 200 }
@@ -74,15 +87,19 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [campo, serie]
                 properties:
                   campo: { type: string }
                   serie:
                     type: array
                     items:
                       type: object
+                      required: [ts, valor]
                       properties:
                         ts: { type: integer }
                         valor: { type: [number, "null"] }
+        "400": { description: Identificador ou campo de série inválido }
+        "404": { description: Dispositivo desconhecido }
   /api/ingest:
     post:
       summary: Ingestão auxiliar de desenvolvimento
@@ -95,6 +112,7 @@ paths:
       responses:
         "200": { description: Mensagem processada }
         "400": { description: JSON ou contrato inválido }
+        "401": { description: Token de ingestão ausente ou inválido }
         "404": { description: Ingestão HTTP desabilitada }
         "413": { description: Corpo acima do limite }
         "415": { description: Content-Type incorreto }
@@ -104,8 +122,23 @@ components:
       name: device_id
       in: path
       required: true
-      schema: { type: string }
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
   schemas:
+    ApiInfo:
+      type: object
+      required: [api_version, telemetry_schema_versions, series_fields, websocket_path, http_ingest_enabled]
+      properties:
+        api_version: { type: string, const: "1.1.0" }
+        telemetry_schema_versions:
+          type: array
+          items: { type: string, enum: ["1.0", "1.1"] }
+        series_fields:
+          type: array
+          items: { type: string }
+        websocket_path: { type: string, const: "/ws" }
+        http_ingest_enabled: { type: boolean }
     Device:
       type: object
       required: [device_id, site_id, online, ultimo]
@@ -116,12 +149,13 @@ components:
         ultimo: { $ref: "./telemetria-v1.1.schema.json" }
     Health:
       type: object
-      required: [ok, ready, mqtt_enabled, mqtt_connected, persistence_enabled, devices, uptime_s]
+      required: [ok, ready, mqtt_enabled, mqtt_connected, mqtt_subscribed, persistence_enabled, devices, uptime_s]
       properties:
         ok: { type: boolean }
         ready: { type: boolean }
         mqtt_enabled: { type: boolean }
         mqtt_connected: { type: boolean }
+        mqtt_subscribed: { type: boolean }
         persistence_enabled: { type: boolean }
         persistence_last_saved_at: { type: [string, "null"], format: date-time }
         persistence_error: { type: [string, "null"] }

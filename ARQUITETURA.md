@@ -211,7 +211,8 @@ que recebe e valida) e **nuvem** (processamento e armazenamento em escala).
 - A **ingestão** local usa **Mosquitto** como broker e o **sink** como validador
   — exatamente os papéis que, na nuvem, o **AWS IoT Core** e a **Lambda**
   exercem.
-- A **nuvem** (planejada pelo Wilson) recebe via IoT Core, amortece picos na
+- A **nuvem** (codificada em CloudFormation e pendente de implantação autorizada)
+  recebe via IoT Core, amortece picos na
   **SQS**, processa na **Lambda** (validação/deduplicação/agregação), guarda o
   estado no **DynamoDB** e o histórico no **S3**.
 

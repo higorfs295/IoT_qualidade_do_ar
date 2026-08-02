@@ -33,7 +33,8 @@ margem; não trocar por partição “huge app” se rollback OTA fizer parte do
 - fragmentação causada por alocações repetidas.
 
 O firmware reduz risco com buffer MQTT/payload de 896 bytes, tópicos e ULIDs em
-arrays fixos, payload global não reentrante, recusa de publicação abaixo de
+arrays fixos, fila circular estática de três payloads, documento global não
+reentrante, recusa de publicação abaixo de
 30 KiB livres e telemetria de heap. O tamanho de 896 bytes é um limite do
 dispositivo, muito menor que o limite do serviço AWS; um payload extremo
 representativo mediu 747 bytes nesta revisão. Aumentar exige medir o
@@ -66,11 +67,24 @@ funções; não silencie a proteção.
 
 ## Dados offline e desgaste
 
-Hoje uma publicação que falha é contabilizada no log e não persiste a leitura.
-Antes do piloto AWS, implementar fila limitada com versão/CRC e política de
-descarte explícita. Preferir lote pequeno em LittleFS/NVS, limitar gravações e
-testar perda de energia. Uma fila ilimitada em RAM não é aceitável; gravar a
-cada amostra sem considerar desgaste também não é.
+A versão 1.3.0 mantém até três mensagens em uma fila circular fixa na RAM. Ela
+preserva ordem e descarta a mais antiga ao lotar; profundidade e total descartado
+são publicados em `metadata`. Isso absorve falhas curtas sem fragmentação, mas a
+fila é perdida em reset/brownout. Antes do piloto AWS, avaliar persistência com
+versão/CRC, lote pequeno em LittleFS/NVS, limite de gravações e teste de perda de
+energia. Não ampliar indefinidamente a RAM nem gravar cada amostra sem medir
+desgaste.
+
+## Resultado de build de 02/08/2026
+
+| Ambiente | RAM estática | Flash/slot OTA |
+|---|---:|---:|
+| `esp32-hil` | 50.608 B (15,4%) | 788.553 B (50,1%) |
+| `esp32-fisico` | 50.692 B (15,5%) | 819.233 B (52,1%) |
+| `esp32-aws` | 51.720 B (15,8%) | 954.301 B (60,7%) |
+
+Os três passam o gate estático. Heap pós-handshake, fragmentação e soak continuam
+dependentes do ESP32 e dos certificados reais.
 
 Certificados PEM em `secrets.h` servem apenas ao protótipo. Produção requer
 credencial exclusiva, flash encryption/secure boot quando aplicável e processo

@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import mqtt from "mqtt";
 import { WebSocketServer } from "ws";
-import { validarContrato, validarTopico } from "./contrato.js";
+import { MEDIDAS_POR_VERSAO, validarContrato, validarTopico } from "./contrato.js";
 import { carregarSnapshot, criarSnapshot, salvarSnapshot } from "./persistence.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -51,6 +51,9 @@ const STATE_FILE = process.env.STATE_FILE || (DATA_DIR ? path.join(DATA_DIR, "st
 const PERSIST_INTERVAL_MS = inteiroPositivo(process.env.PERSIST_INTERVAL_MS, 5000, 3600000);
 const HTTP_INGEST_ENABLED = process.env.ENABLE_HTTP_INGEST === "true" ||
   (process.env.NODE_ENV !== "production" && process.env.ENABLE_HTTP_INGEST !== "false");
+const CORS_ORIGINS = new Set((process.env.CORS_ORIGINS || "")
+  .split(",").map((item) => item.trim().replace(/\/$/, "")).filter(Boolean));
+const CAMPOS_SERIE = new Set([...new Set(Object.values(MEDIDAS_POR_VERSAO).flat()), "gas_raw_v"]);
 
 // --- Estado em memoria -------------------------------------------------------
 const dispositivos = new Map(); // device_id -> { site_id, ultimo, serie[], ultimoSeq, ultimoVistoMs }
@@ -75,6 +78,7 @@ async function restaurarPersistencia() {
     for (const [id, d] of salvo.dispositivos) dispositivos.set(id, d);
     for (const [id, instante] of salvo.idsVistos) idsVistos.set(id, instante);
     Object.assign(metricas, salvo.metricas, { inicio: Date.now() });
+    ultimoPersistidoEm = salvo.savedAt;
     console.log(`[persistencia] restaurados ${dispositivos.size} dispositivo(s)`);
   } catch (erro) {
     erroPersistencia = erro.message;
@@ -192,6 +196,38 @@ function json(res, code, obj) {
   res.end(s);
 }
 
+function metodoPermitido(req, res, permitido) {
+  if (req.method === permitido) return true;
+  res.setHeader("allow", permitido);
+  json(res, 405, { erro: `metodo nao permitido; use ${permitido}` });
+  return false;
+}
+
+function aplicarCors(req, res) {
+  const origem = req.headers.origin?.replace(/\/$/, "");
+  const permitida = origem && CORS_ORIGINS.has(origem);
+  if (permitida) {
+    res.setHeader("access-control-allow-origin", origem);
+    res.setHeader("vary", "Origin");
+    res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+    res.setHeader("access-control-allow-headers", "Content-Type, Authorization");
+    res.setHeader("access-control-max-age", "600");
+  }
+  if (req.method !== "OPTIONS") return false;
+  if (!permitida) {
+    json(res, 403, { erro: "origem CORS nao autorizada" });
+  } else {
+    res.writeHead(204);
+    res.end();
+  }
+  return true;
+}
+
+function decodificarSegmento(valor) {
+  try { return decodeURIComponent(valor); }
+  catch { return null; }
+}
+
 async function servirEstatico(res, urlPath) {
   let rel;
   try { rel = decodeURIComponent(urlPath === "/" ? "index.html" : urlPath.replace(/^\/+/, "")); }
@@ -210,21 +246,27 @@ async function servirEstatico(res, urlPath) {
   }
 }
 
-const servidor = http.createServer(async (req, res) => {
+async function tratarRequisicao(req, res) {
   res.setHeader("x-content-type-options", "nosniff");
   res.setHeader("x-frame-options", "DENY");
   res.setHeader("referrer-policy", "no-referrer");
-  res.setHeader("content-security-policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:");
-  const url = new URL(req.url, "http://localhost");
+  res.setHeader("permissions-policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("content-security-policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https: ws: wss:; img-src 'self' data:");
+  if (aplicarCors(req, res)) return;
+  let url;
+  try { url = new URL(req.url, "http://localhost"); }
+  catch { return json(res, 400, { erro: "URL invalida" }); }
   const p = url.pathname;
 
   // --- API ---
   if (p === "/api/health") {
+    if (!metodoPermitido(req, res, "GET")) return;
     return json(res, 200, {
       ok: true,
-      ready: !MQTT_ENABLED || mqttConectado,
+      ready: !MQTT_ENABLED || (mqttConectado && mqttAssinado),
       mqtt_enabled: MQTT_ENABLED,
       mqtt_connected: mqttConectado,
+      mqtt_subscribed: mqttAssinado,
       persistence_enabled: Boolean(STATE_FILE),
       persistence_last_saved_at: ultimoPersistidoEm,
       persistence_error: erroPersistencia,
@@ -232,20 +274,39 @@ const servidor = http.createServer(async (req, res) => {
       uptime_s: Math.round((Date.now() - metricas.inicio) / 1000),
     });
   }
+  if (p === "/api/info") {
+    if (!metodoPermitido(req, res, "GET")) return;
+    return json(res, 200, {
+      api_version: "1.1.0",
+      telemetry_schema_versions: ["1.0", "1.1"],
+      series_fields: [...CAMPOS_SERIE].sort(),
+      websocket_path: "/ws",
+      http_ingest_enabled: HTTP_INGEST_ENABLED,
+    });
+  }
   if (p === "/api/dispositivos") {
+    if (!metodoPermitido(req, res, "GET")) return;
     const lista = [...dispositivos.entries()].map(([id, d]) => ({
       device_id: id, site_id: d.site_id, online: online(d), ultimo: d.ultimo,
-    }));
+    })).sort((a, b) => a.device_id.localeCompare(b.device_id));
     return json(res, 200, lista);
   }
-  if (p.startsWith("/api/dispositivos/") && p.endsWith("/atual")) {
-    const id = decodeURIComponent(p.split("/")[3]);
+  const rotaAtual = /^\/api\/dispositivos\/([^/]+)\/atual$/.exec(p);
+  if (rotaAtual) {
+    if (!metodoPermitido(req, res, "GET")) return;
+    const id = decodificarSegmento(rotaAtual[1]);
+    if (id === null) return json(res, 400, { erro: "device_id invalido" });
     const d = dispositivos.get(id);
     return d ? json(res, 200, d.ultimo) : json(res, 404, { erro: "sem dispositivo" });
   }
-  if (p.startsWith("/api/dispositivos/") && p.endsWith("/serie")) {
-    const id = decodeURIComponent(p.split("/")[3]);
+  const rotaSerie = /^\/api\/dispositivos\/([^/]+)\/serie$/.exec(p);
+  if (rotaSerie) {
+    if (!metodoPermitido(req, res, "GET")) return;
+    const id = decodificarSegmento(rotaSerie[1]);
+    if (id === null) return json(res, 400, { erro: "device_id invalido" });
     const campo = url.searchParams.get("campo") || "co2_ppm";
+    if (!CAMPOS_SERIE.has(campo))
+      return json(res, 400, { erro: "campo de serie invalido", campos: [...CAMPOS_SERIE].sort() });
     const pedido = Number(url.searchParams.get("n") || 200);
     const n = Number.isInteger(pedido) && pedido > 0 ? Math.min(pedido, SERIE_MAX) : 200;
     const d = dispositivos.get(id);
@@ -254,6 +315,7 @@ const servidor = http.createServer(async (req, res) => {
     return json(res, 200, { campo, serie });
   }
   if (p === "/api/metricas") {
+    if (!metodoPermitido(req, res, "GET")) return;
     return json(res, 200, {
       ...metricas, dispositivos: dispositivos.size,
       online: [...dispositivos.values()].filter(online).length,
@@ -261,6 +323,7 @@ const servidor = http.createServer(async (req, res) => {
     });
   }
   if (p === "/metrics") {
+    if (!metodoPermitido(req, res, "GET")) return;
     const linhas = [
       "# HELP qar_messages_received_total Mensagens recebidas pelo backend.",
       "# TYPE qar_messages_received_total counter",
@@ -277,6 +340,8 @@ const servidor = http.createServer(async (req, res) => {
       `qar_devices_online ${[...dispositivos.values()].filter(online).length}`,
       "# TYPE qar_mqtt_connected gauge",
       `qar_mqtt_connected ${mqttConectado ? 1 : 0}`,
+      "# TYPE qar_mqtt_subscribed gauge",
+      `qar_mqtt_subscribed ${mqttAssinado ? 1 : 0}`,
       "# TYPE qar_persistence_error gauge",
       `qar_persistence_error ${erroPersistencia ? 1 : 0}`,
       "",
@@ -315,40 +380,74 @@ const servidor = http.createServer(async (req, res) => {
     return;
   }
 
+  if (p.startsWith("/api/")) return json(res, 404, { erro: "recurso inexistente" });
+
   // --- Estatico (dashboard) ---
+  if (!metodoPermitido(req, res, "GET")) return;
   return servirEstatico(res, p);
+}
+
+const servidor = http.createServer((req, res) => {
+  void tratarRequisicao(req, res).catch((erro) => {
+    console.error(`[http] falha inesperada: ${erro.message}`);
+    if (!res.headersSent) json(res, 500, { erro: "falha interna" });
+    else res.destroy();
+  });
 });
 
 // --- WebSocket (tempo real) --------------------------------------------------
-const wss = new WebSocketServer({ server: servidor, path: "/ws" });
+const wss = new WebSocketServer({ server: servidor, path: "/ws", maxPayload: 65536 });
 function broadcast(obj) {
   const s = JSON.stringify(obj);
   for (const c of wss.clients) if (c.readyState === 1) c.send(s);
 }
 wss.on("connection", (ws) => {
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
   ws.send(JSON.stringify({ tipo: "ola", dispositivos: dispositivos.size }));
 });
+const timerWebSocket = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) { ws.terminate(); continue; }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, 30000);
+timerWebSocket.unref();
 
 // --- MQTT --------------------------------------------------------------------
 let mqttConectado = false;
+let mqttAssinado = false;
 let clienteMqtt = null;
+
+function mqttUrlSemSegredo(valor) {
+  try {
+    const url = new URL(valor);
+    if (url.username) url.username = "***";
+    if (url.password) url.password = "***";
+    return url.toString();
+  } catch { return "URL MQTT configurada"; }
+}
 
 function conectarMqtt() {
   const cli = mqtt.connect(MQTT_URL, { reconnectPeriod: 3000 });
   clienteMqtt = cli;
   cli.on("connect", () => {
     mqttConectado = true;
-    console.log(`[mqtt] conectado em ${MQTT_URL}`);
+    mqttAssinado = false;
+    console.log(`[mqtt] conectado em ${mqttUrlSemSegredo(MQTT_URL)}`);
     const filtro = "qualidade-ar/+/+/telemetria";
-    cli.subscribe(filtro, { qos: 1 }, (e) =>
-      console.log(e ? `[mqtt] falha ao assinar: ${e}` : `[mqtt] assinando ${filtro}`));
+    cli.subscribe(filtro, { qos: 1 }, (e) => {
+      mqttAssinado = !e;
+      console.log(e ? `[mqtt] falha ao assinar: ${e}` : `[mqtt] assinando ${filtro}`);
+    });
   });
   cli.on("message", (topico, payload) => {
     try { ingerir(JSON.parse(payload.toString()), "mqtt", topico); }
     catch { metricas.recebidas++; metricas.invalidas++; marcarPersistencia(); }
   });
-  cli.on("close", () => { mqttConectado = false; });
-  cli.on("offline", () => { mqttConectado = false; });
+  cli.on("close", () => { mqttConectado = false; mqttAssinado = false; });
+  cli.on("offline", () => { mqttConectado = false; mqttAssinado = false; });
   cli.on("error", (e) => console.log(`[mqtt] erro: ${e.message}`));
 }
 
@@ -370,6 +469,7 @@ async function encerrar(sinal) {
   encerrando = true;
   console.log(`[sistema] ${sinal}; encerrando com persistencia...`);
   if (timerPersistencia) clearInterval(timerPersistencia);
+  clearInterval(timerWebSocket);
   await persistirAgora(true);
   if (clienteMqtt) clienteMqtt.end(true);
   wss.close();

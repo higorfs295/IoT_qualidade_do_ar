@@ -1,31 +1,43 @@
-/* charts.js — sparkline SVG inline sem dependencias.
- * Adaptado do charts.js do IoT-IDEA. Retorna string SVG para innerHTML.
- */
+/* Gráficos SVG sem dependências externas; entradas são exclusivamente numéricas. */
 (function (global) {
   "use strict";
-  function minmax(a) {
-    var mn = Infinity, mx = -Infinity;
-    for (var i = 0; i < a.length; i++) { if (a[i] < mn) mn = a[i]; if (a[i] > mx) mx = a[i]; }
-    if (!isFinite(mn)) { mn = 0; mx = 1; }
-    return { mn: mn, mx: mx, rng: (mx - mn) || 1 };
+  function values(input) {
+    return (input || []).map(function (item) {
+      return typeof item === "number" ? item : item && item.valor;
+    }).filter(function (value) { return typeof value === "number" && isFinite(value); });
   }
-  function sparkline(arr, opt) {
-    opt = opt || {};
-    var w = opt.w || 190, h = opt.h || 30, pad = 3, cor = opt.cor || "#38bdf8";
-    arr = (arr || []).filter(function (v) { return typeof v === "number"; });
-    if (arr.length < 2)
-      return '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:' + h + 'px"></svg>';
-    var mm = minmax(arr);
-    var pts = arr.map(function (v, i) {
-      var x = pad + (i / (arr.length - 1)) * (w - 2 * pad);
-      var y = h - pad - ((v - mm.mn) / mm.rng) * (h - 2 * pad);
+  function minmax(input) {
+    var data = values(input), min = Math.min.apply(null, data), max = Math.max.apply(null, data);
+    if (!data.length) return { min: 0, max: 1, range: 1 };
+    return { min: min, max: max, range: (max - min) || 1 };
+  }
+  function points(data, width, height, padding, mm) {
+    return data.map(function (value, index) {
+      var x = padding + (index / Math.max(1, data.length - 1)) * (width - 2 * padding);
+      var y = height - padding - ((value - mm.min) / mm.range) * (height - 2 * padding);
       return x.toFixed(1) + "," + y.toFixed(1);
     }).join(" ");
-    var last = arr[arr.length - 1];
-    var lx = w - pad, ly = h - pad - ((last - mm.mn) / mm.rng) * (h - 2 * pad);
-    return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:' + h + 'px">' +
-      '<polyline points="' + pts + '" fill="none" stroke="' + cor + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
-      '<circle cx="' + lx.toFixed(1) + '" cy="' + ly.toFixed(1) + '" r="2.4" fill="' + cor + '"/></svg>';
   }
-  global.Charts = { sparkline: sparkline };
+  function sparkline(input, opt) {
+    opt = opt || {};
+    var data = values(input), width = opt.w || 190, height = opt.h || 34, pad = 3, color = opt.cor || "#23b6a8";
+    if (data.length < 2) return '<svg viewBox="0 0 ' + width + " " + height + '" aria-hidden="true"></svg>';
+    return '<svg viewBox="0 0 ' + width + " " + height + '" preserveAspectRatio="none" aria-hidden="true">' +
+      '<polyline points="' + points(data, width, height, pad, minmax(data)) + '" fill="none" stroke="' + color + '" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  }
+  function line(input, opt) {
+    opt = opt || {};
+    var data = values(input), width = 900, height = 300, padX = 34, padY = 28, color = opt.cor || "#23b6a8";
+    if (data.length < 2) return "";
+    var mm = minmax(data), plotPoints = points(data, width, height, padY, mm);
+    var areaPoints = padX + "," + (height - padY) + " " + plotPoints + " " + (width - padX) + "," + (height - padY);
+    return '<svg viewBox="0 0 900 300" preserveAspectRatio="none" aria-hidden="true">' +
+      '<defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + color + '" stop-opacity=".30"/><stop offset="1" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' +
+      '<line x1="28" y1="272" x2="872" y2="272" class="chart-grid"/>' +
+      '<line x1="28" y1="150" x2="872" y2="150" class="chart-grid"/>' +
+      '<line x1="28" y1="28" x2="872" y2="28" class="chart-grid"/>' +
+      '<polygon points="' + areaPoints + '" fill="url(#area)"/>' +
+      '<polyline points="' + plotPoints + '" fill="none" stroke="' + color + '" stroke-width="4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  }
+  global.Charts = { sparkline: sparkline, line: line, values: values };
 })(window);

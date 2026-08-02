@@ -3,19 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Qualidade do Ar — Painel</title>
-  <meta name="theme-color" content="#12324a" />
-  <meta name="description" content="Painel local da estação IoT de qualidade do ar" />
+  <title>Air Sense — Qualidade do Ar</title>
+  <meta name="theme-color" content="#0b2f43" />
+  <meta name="description" content="Painel local e instalável da estação IoT Air Sense" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <header class="topo">
-    <div class="marca">🌬️ <strong>Qualidade do Ar</strong></div>
+    <a class="marca" href="#agora" aria-label="Air Sense — início">
+      <span class="marca-icone" aria-hidden="true">≈</span>
+      <span><strong>Air Sense</strong><small>qualidade do ar</small></span>
+    </a>
+    <nav class="navegacao" aria-label="Seções do painel">
+      <button class="nav-item ativo" data-view="agora" type="button">Agora</button>
+      <button class="nav-item" data-view="historico" type="button">Histórico</button>
+      <button class="nav-item" data-view="alertas" type="button">Alertas <span id="alertBadge" class="badge" hidden>0</span></button>
+      <button class="nav-item" data-view="dispositivo" type="button">Dispositivo</button>
+    </nav>
     <div class="controles">
-      <button id="installApp" type="button" hidden>Instalar app</button>
-      <select id="seletorDispositivo" title="Dispositivo"></select>
+      <button id="installApp" class="botao secundario" type="button" hidden>Instalar</button>
+      <select id="seletorDispositivo" aria-label="Dispositivo"></select>
       <span id="conexao" class="conexao off">conectando…</span>
     </div>
   </header>
@@ -25,24 +34,71 @@
       Protótipo educacional: não substitui instrumentos calibrados, alarmes de
       incêndio, detectores certificados de gás ou orientação profissional.
     </aside>
-    <!-- Veredito grande, legivel por qualquer pessoa -->
-    <section id="veredito" class="veredito bom">
-      <div class="veredito-emoji" id="vEmoji">🙂</div>
-      <div class="veredito-texto">
-        <div class="veredito-titulo" id="vTitulo">Ar bom</div>
-        <div class="veredito-acao" id="vAcao">Ambiente saudável.</div>
-      </div>
-      <div class="veredito-quando" id="vQuando"></div>
+
+    <section id="modoBanner" class="modo-banner" hidden>
+      <span><strong>Dados demonstrativos.</strong> Nenhuma leitura desta tela veio de um sensor real.</span>
+      <button id="tentarLive" class="botao claro" type="button">Tentar conectar</button>
     </section>
 
-    <!-- Cartoes por grandeza -->
-    <section class="grade" id="grade"></section>
+    <section class="view ativa" data-view-panel="agora" aria-labelledby="tituloAgora">
+      <div class="secao-cabecalho">
+        <div><p class="eyebrow">MONITORAMENTO EM TEMPO REAL</p><h1 id="tituloAgora">Como está o ambiente agora?</h1></div>
+        <button id="atualizarAgora" class="botao secundario" type="button">Atualizar</button>
+      </div>
+      <section id="veredito" class="veredito neutro" aria-live="polite">
+        <div class="veredito-emoji" id="vEmoji" aria-hidden="true">?</div>
+        <div class="veredito-texto">
+          <div class="veredito-titulo" id="vTitulo">Sem dados</div>
+          <div class="veredito-acao" id="vAcao">Aguardando a primeira leitura.</div>
+        </div>
+        <div class="veredito-quando" id="vQuando"></div>
+      </section>
+      <section class="grade" id="grade" aria-label="Medições atuais"></section>
+    </section>
+
+    <section class="view" data-view-panel="historico" aria-labelledby="tituloHistorico" hidden>
+      <div class="secao-cabecalho">
+        <div><p class="eyebrow">TENDÊNCIAS</p><h1 id="tituloHistorico">Histórico de medições</h1></div>
+        <div class="filtros">
+          <select id="campoHistorico" aria-label="Grandeza histórica"></select>
+          <select id="pontosHistorico" aria-label="Quantidade de pontos">
+            <option value="60">60 pontos</option><option value="200" selected>200 pontos</option><option value="1000">1.000 pontos</option>
+          </select>
+        </div>
+      </div>
+      <article class="painel grafico-painel">
+        <div class="grafico-resumo"><div><span id="histNome">CO₂</span><strong id="histAtual">—</strong></div><div><span>Mínimo</span><strong id="histMin">—</strong></div><div><span>Média</span><strong id="histMedia">—</strong></div><div><span>Máximo</span><strong id="histMax">—</strong></div></div>
+        <div id="graficoHistorico" class="grafico-grande" role="img" aria-label="Série histórica"></div>
+        <p id="histVazio" class="estado-vazio" hidden>Não há pontos suficientes para esta grandeza.</p>
+      </article>
+    </section>
+
+    <section class="view" data-view-panel="alertas" aria-labelledby="tituloAlertas" hidden>
+      <div class="secao-cabecalho">
+        <div><p class="eyebrow">EVENTOS LOCAIS</p><h1 id="tituloAlertas">Alertas recentes</h1></div>
+        <button id="reconhecerTodos" class="botao secundario" type="button">Reconhecer todos</button>
+      </div>
+      <div id="listaAlertas" class="lista-alertas"></div>
+      <p id="alertasVazio" class="estado-vazio">Nenhum alerta registrado nesta sessão.</p>
+    </section>
+
+    <section class="view" data-view-panel="dispositivo" aria-labelledby="tituloDispositivo" hidden>
+      <div class="secao-cabecalho"><div><p class="eyebrow">DIAGNÓSTICO</p><h1 id="tituloDispositivo">Dispositivo e infraestrutura</h1></div></div>
+      <section id="diagnostico" class="diagnostico-grid"></section>
+    </section>
 
     <footer class="rodape">
-      <span id="metricas"></span>
-      <span class="dica">Cores = faixas operacionais do protótipo, não limites legais instantâneos</span>
+      <span id="metricas">Aguardando o backend…</span>
+      <span class="dica">Cores = faixas operacionais do protótipo, não limites legais instantâneos.</span>
     </footer>
   </main>
+
+  <nav class="navegacao-mobile" aria-label="Seções do painel no celular">
+    <button class="nav-item ativo" data-view="agora" type="button">Agora</button>
+    <button class="nav-item" data-view="historico" type="button">Histórico</button>
+    <button class="nav-item" data-view="alertas" type="button">Alertas</button>
+    <button class="nav-item" data-view="dispositivo" type="button">Dispositivo</button>
+  </nav>
 
   <script src="/config.js"></script>
   <script src="/charts.js"></script>

@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Sandbox de ingestao do monitor de qualidade do ar: IoT Rule, SQS/DLQ, S3 e estado atual DynamoDB.",
+  "Description": "Sandbox Air Sense: IoT Rule, SQS/DLQ, Lambda, S3 bruto, DynamoDB e alarmes.",
   "Parameters": {
     "EnvironmentName": {
       "Type": "String",
@@ -12,6 +12,30 @@
       "Default": 30,
       "MinValue": 1,
       "MaxValue": 3650
+    },
+    "LambdaCodeS3Bucket": {
+      "Type": "String",
+      "Description": "Bucket que contem o ZIP gerado por lambda_ingest/package.py."
+    },
+    "LambdaCodeS3Key": {
+      "Type": "String",
+      "Description": "Chave S3 do ZIP do consumidor."
+    },
+    "LambdaCodeS3ObjectVersion": {
+      "Type": "String",
+      "Default": "",
+      "Description": "VersionId opcional do ZIP quando o bucket de artefatos usa versionamento."
+    },
+    "LambdaReservedConcurrency": {
+      "Type": "Number",
+      "Default": 2,
+      "MinValue": 2,
+      "MaxValue": 100
+    }
+  },
+  "Conditions": {
+    "HasLambdaCodeVersion": {
+      "Fn::Not": [{ "Fn::Equals": [{ "Ref": "LambdaCodeS3ObjectVersion" }, ""] }]
     }
   },
   "Resources": {
@@ -20,7 +44,7 @@
       "Properties": {
         "SqsManagedSseEnabled": true,
         "MessageRetentionPeriod": 1209600,
-        "Tags": [{ "Key": "Project", "Value": "qar" }]
+        "Tags": [{ "Key": "Project", "Value": "air-sense" }, { "Key": "Environment", "Value": { "Ref": "EnvironmentName" } }]
       }
     },
     "TelemetryQueue": {
@@ -29,11 +53,12 @@
         "SqsManagedSseEnabled": true,
         "VisibilityTimeout": 120,
         "MessageRetentionPeriod": 345600,
+        "ReceiveMessageWaitTimeSeconds": 20,
         "RedrivePolicy": {
           "deadLetterTargetArn": { "Fn::GetAtt": ["TelemetryDlq", "Arn"] },
           "maxReceiveCount": 5
         },
-        "Tags": [{ "Key": "Project", "Value": "qar" }]
+        "Tags": [{ "Key": "Project", "Value": "air-sense" }, { "Key": "Environment", "Value": { "Ref": "EnvironmentName" } }]
       }
     },
     "RawBucket": {
@@ -58,7 +83,7 @@
             "ExpirationInDays": { "Ref": "RawRetentionDays" }
           }]
         },
-        "Tags": [{ "Key": "Project", "Value": "qar" }]
+        "Tags": [{ "Key": "Project", "Value": "air-sense" }, { "Key": "Environment", "Value": { "Ref": "EnvironmentName" } }]
       }
     },
     "CurrentStateTable": {
@@ -69,7 +94,7 @@
         "AttributeDefinitions": [{ "AttributeName": "device_key", "AttributeType": "S" }],
         "KeySchema": [{ "AttributeName": "device_key", "KeyType": "HASH" }],
         "PointInTimeRecoverySpecification": { "PointInTimeRecoveryEnabled": true },
-        "Tags": [{ "Key": "Project", "Value": "qar" }]
+        "Tags": [{ "Key": "Project", "Value": "air-sense" }, { "Key": "Environment", "Value": { "Ref": "EnvironmentName" } }]
       }
     },
     "IoTRuleRole": {
@@ -103,7 +128,8 @@
               }
             ]
           }
-        }]
+        }],
+        "Tags": [{ "Key": "Project", "Value": "air-sense" }, { "Key": "Environment", "Value": { "Ref": "EnvironmentName" } }]
       }
     },
     "TelemetryRule": {
@@ -124,7 +150,7 @@
             {
               "S3": {
                 "BucketName": { "Ref": "RawBucket" },
-                "Key": "raw/${topic(2)}/${topic(3)}/${timestamp()}.json",
+                "Key": "raw/${topic(2)}/${topic(3)}/${timestamp()}-${message_id}.json",
                 "RoleArn": { "Fn::GetAtt": ["IoTRuleRole", "Arn"] }
               }
             }
@@ -137,6 +163,92 @@
             }
           }
         }
+      }
+    },
+    "LambdaIngestRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": { "Service": "lambda.amazonaws.com" },
+            "Action": "sts:AssumeRole"
+          }]
+        },
+        "Policies": [{
+          "PolicyName": "ConsumeTelemetry",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"],
+                "Resource": { "Fn::GetAtt": ["TelemetryQueue", "Arn"] }
+              },
+              {
+                "Effect": "Allow",
+                "Action": "dynamodb:PutItem",
+                "Resource": { "Fn::GetAtt": ["CurrentStateTable", "Arn"] }
+              },
+              {
+                "Effect": "Allow",
+                "Action": "logs:CreateLogGroup",
+                "Resource": { "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*" }
+              },
+              {
+                "Effect": "Allow",
+                "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                "Resource": { "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-ingest:*" }
+              }
+            ]
+          }
+        }],
+        "Tags": [{ "Key": "Project", "Value": "air-sense" }, { "Key": "Environment", "Value": { "Ref": "EnvironmentName" } }]
+      }
+    },
+    "LambdaLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": { "Fn::Sub": "/aws/lambda/${AWS::StackName}-ingest" },
+        "RetentionInDays": 30
+      }
+    },
+    "TelemetryIngestFunction": {
+      "Type": "AWS::Lambda::Function",
+      "DependsOn": ["LambdaLogGroup"],
+      "Properties": {
+        "FunctionName": { "Fn::Sub": "${AWS::StackName}-ingest" },
+        "Description": "Valida telemetria v1.1 e atualiza o estado atual idempotente.",
+        "Runtime": "python3.13",
+        "Handler": "handler.handler",
+        "Role": { "Fn::GetAtt": ["LambdaIngestRole", "Arn"] },
+        "MemorySize": 256,
+        "Timeout": 30,
+        "ReservedConcurrentExecutions": { "Ref": "LambdaReservedConcurrency" },
+        "Code": {
+          "S3Bucket": { "Ref": "LambdaCodeS3Bucket" },
+          "S3Key": { "Ref": "LambdaCodeS3Key" },
+          "S3ObjectVersion": {
+            "Fn::If": ["HasLambdaCodeVersion", { "Ref": "LambdaCodeS3ObjectVersion" }, { "Ref": "AWS::NoValue" }]
+          }
+        },
+        "Environment": {
+          "Variables": { "CURRENT_STATE_TABLE": { "Ref": "CurrentStateTable" } }
+        },
+        "Tags": [{ "Key": "Project", "Value": "air-sense" }, { "Key": "Environment", "Value": { "Ref": "EnvironmentName" } }]
+      }
+    },
+    "TelemetryQueueMapping": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "EventSourceArn": { "Fn::GetAtt": ["TelemetryQueue", "Arn"] },
+        "FunctionName": { "Ref": "TelemetryIngestFunction" },
+        "Enabled": true,
+        "BatchSize": 10,
+        "MaximumBatchingWindowInSeconds": 5,
+        "FunctionResponseTypes": ["ReportBatchItemFailures"],
+        "ScalingConfig": { "MaximumConcurrency": { "Ref": "LambdaReservedConcurrency" } }
       }
     },
     "DlqVisibleAlarm": {
@@ -153,6 +265,36 @@
         "ComparisonOperator": "GreaterThanThreshold",
         "TreatMissingData": "notBreaching"
       }
+    },
+    "QueueAgeAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "A fila de telemetria esta atrasada por mais de cinco minutos.",
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateAgeOfOldestMessage",
+        "Dimensions": [{ "Name": "QueueName", "Value": { "Fn::GetAtt": ["TelemetryQueue", "QueueName"] } }],
+        "Statistic": "Maximum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 300,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching"
+      }
+    },
+    "LambdaErrorsAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "O consumidor Lambda registrou erro de invocacao.",
+        "Namespace": "AWS/Lambda",
+        "MetricName": "Errors",
+        "Dimensions": [{ "Name": "FunctionName", "Value": { "Ref": "TelemetryIngestFunction" } }],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching"
+      }
     }
   },
   "Outputs": {
@@ -160,6 +302,8 @@
     "TelemetryDlqUrl": { "Value": { "Ref": "TelemetryDlq" } },
     "RawBucketName": { "Value": { "Ref": "RawBucket" } },
     "CurrentStateTableName": { "Value": { "Ref": "CurrentStateTable" } },
+    "TelemetryIngestFunctionName": { "Value": { "Ref": "TelemetryIngestFunction" } },
+    "TelemetryIngestFunctionArn": { "Value": { "Fn::GetAtt": ["TelemetryIngestFunction", "Arn"] } },
     "IoTRuleRoleArn": { "Value": { "Fn::GetAtt": ["IoTRuleRole", "Arn"] } }
   }
 }

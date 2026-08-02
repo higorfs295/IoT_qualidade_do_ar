@@ -29,6 +29,7 @@ instâncias. A instalação padrão já é persistente em nó único. Veja
 | Método | Rota | Uso |
 |---|---|---|
 | GET | `/api/dispositivos` | lista dispositivos e último status |
+| GET | `/api/info` | versão, schemas, campos de série e capacidades |
 | GET | `/api/dispositivos/:id/atual` | leitura mais recente |
 | GET | `/api/dispositivos/:id/serie?campo=&n=` | ring buffer de uma grandeza |
 | GET | `/api/metricas` | contadores JSON |
@@ -54,6 +55,13 @@ Em `NODE_ENV=production`, a ingestão HTTP fica desabilitada por padrão. Use
 | `STATE_FILE` | `$DATA_DIR/state.json` | caminho opcional explícito |
 | `PERSIST_INTERVAL_MS` | 5.000 | intervalo mínimo entre snapshots |
 | `MQTT_ENABLED` | true | permite execução isolada sem broker |
+| `CORS_ORIGINS` | vazio | lista explícita, separada por vírgulas |
+| `HTTP_INGEST_TOKEN` | vazio | Bearer opcional para ingestão de desenvolvimento |
+
+`ready` só é verdadeiro quando MQTT está conectado **e a assinatura do tópico
+foi confirmada**; consulte `mqtt_subscribed`. Requisições a métodos não
+permitidos retornam `405`, campos históricos desconhecidos retornam `400` e URLs
+malformadas não derrubam o processo.
 
 ## Container
 

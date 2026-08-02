@@ -1,40 +1,43 @@
-# Dashboard — Ingestão + Web (Fase 2)
+# Dashboard Air Sense
 
-O ecossistema de visualização da estação: um **serviço de ingestão** que assina
-o broker MQTT, valida o contrato v1.1, guarda série temporal e expõe uma API
-REST + WebSocket; e um **dashboard web** legível por um **usuário leigo**.
-
-> Status: **aplicação local funcional**. A instalação padrão inclui MQTT,
-> persistência, healthcheck, métricas, dados de demonstração e painel PWA.
+Aplicação local completa de ingestão e visualização: o backend assina MQTT,
+valida o contrato v1.1, mantém estado/série curta persistentes e atende a Web/PWA
+e o app Flutter por REST e WebSocket.
 
 ```text
-dashboard/
-├── backend/    ingestão + API (Node: MQTT + REST + WebSocket + persistência)
-│   └── src/{server.js, contrato.js}
-└── web/        painel web (verdito por cor, cartões, sparklines, tempo real)
-    └── public/{index.html, style.css, app.js, charts.js, config.js}
+ESP32/demo -> MQTT QoS 1 -> backend -> REST/WS -> Web/PWA
+                                      └───────> Flutter
 ```
 
-## Como rodar
+## Executar
+
+Na raiz:
 
 ```bash
-cd ..
 docker compose up -d --build
-# abra http://localhost:3001
 ```
 
-## Fluxo
+Abra `http://localhost:3001`. A demonstração identificada cria três dispositivos
+por padrão. Para desenvolvimento sem broker:
 
-```text
-ESP32 ─MQTT─▶ Broker ─▶ [backend: assina, valida, persiste] ─REST/WebSocket─▶ [web] e [mobile]
+```bash
+cd dashboard/backend
+npm ci
+MQTT_ENABLED=false ENABLE_HTTP_INGEST=true DATA_DIR=./data npm start
 ```
 
-- **backend** e **web** são implementações deliberadamente pequenas em Node e
-  JavaScript puro. O banco local é um snapshot atômico; PostgreSQL/TimescaleDB é
-  indicado quando histórico longo, consultas complexas ou alta disponibilidade
-  forem necessários.
-- Para gráficos imediatos e sem build, o front pode começar com o `charts.js`
-  (SVG puro, sem dependências) do **IoT-IDEA**, evoluindo para componentes React.
-- A **legibilidade para leigos** é requisito de projeto: ver `web/README.md`.
+## Entregue
 
-Detalhes de cada parte nos READMEs de [`backend/`](backend/) e [`web/`](web/).
+- validação, deduplicação, lacunas, limites e snapshot atômico;
+- health/readiness, métricas JSON/Prometheus e graceful shutdown;
+- API REST documentada e WebSocket com heartbeat/limite de payload;
+- cabeçalhos de segurança e CORS somente para origens explícitas;
+- PWA responsiva com Agora, Histórico, Alertas e Dispositivo;
+- atualização live, reconexão, shell offline e modo demo sempre sinalizado.
+
+O snapshot JSON é adequado a nó único e histórico curto. Para retenção longa,
+HA e consultas multiusuário, siga o marco B1 em
+[`../docs/ROADMAP_SOFTWARE.md`](../docs/ROADMAP_SOFTWARE.md).
+
+Detalhes: [`backend/README.md`](backend/README.md) e
+[`web/README.md`](web/README.md).

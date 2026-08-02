@@ -119,6 +119,25 @@ remover ou restringir a exceção de cleartext. No iOS foi habilitado apenas o
 acesso à rede local; endpoints externos continuam sujeitos às regras normais de
 segurança de transporte.
 
+### Build verificado nesta revisão
+
+Em 02/08/2026 foram executados `flutter analyze` (sem ocorrência), 10 testes,
+Web release e Android release com Flutter 3.44.6/Dart 3.12.2, JDK 21 e SDK em
+`E:\Android_SDk`. O pacote piloto é:
+
+[`../entrega/mobile/AirSense-piloto-1.0.0-release-debug-signed.apk`](../entrega/mobile/AirSense-piloto-1.0.0-release-debug-signed.apk)
+
+```text
+package: br.edu.ufg.air_sense
+version: 1.0.0
+minSdk: 24
+target/compileSdk: 36
+SHA-256: 21862DAFDF4EFD277AB36C81C2FE8853D521FFA9F57D04D9B3A72726A03ADCEC
+```
+
+O APK passou na verificação de assinatura V2, porém com certificado Android
+Debug. Ele serve ao piloto local; não é um binário de loja.
+
 ## Estrutura
 
 ```text

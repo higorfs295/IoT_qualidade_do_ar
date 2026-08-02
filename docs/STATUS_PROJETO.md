@@ -1,85 +1,65 @@
 # Status auditado da base
 
-Data da auditoria: 2 de agosto de 2026.
+Data de corte: 2 de agosto de 2026.
 
 ## Resultado executivo
 
-A aplicação local está empacotada para uso em um comando: Mosquitto, gerador de
-telemetria, backend persistente e dashboard/PWA. A stack foi construída e
-testada em contêineres isolados, inclusive com reinício do backend e restauração
-dos dados. O firmware possui três perfis compiláveis para o DevKit USB-C de 30
-pinos com módulo ESP-WROOM-32.
+A cadeia local está funcional: Mosquitto, demo, backend persistente, API/WS,
+Web/PWA e app Flutter usam o mesmo contrato v1.1. O firmware possui três perfis
+compilados para DevKit 30P USB-C com ESP-WROOM-32. A infraestrutura AWS está
+codificada e empacotada, mas não foi aplicada a uma conta sem autorização de
+custo/credenciais.
 
-O que não pode ser concluído apenas em software continua explicitamente
-separado: montagem elétrica, calibração, fabricação da PCB, modelagem mecânica a
-partir das peças medidas e aplicação dos recursos em uma conta AWS real.
-
-## Evidências desta revisão
+## Evidências reproduzidas
 
 | Verificação | Resultado |
 |---|---|
-| Instalação local | Compose validado; broker, backend, PWA e demo sobem juntos |
-| Smoke test em contêiner | MQTT conectado, múltiplos dispositivos, manifest/service worker e API aprovados |
-| Persistência | snapshot atômico restaurado após reinício do backend |
-| Testes Python | 11/11 aprovados, incluindo lote parcial do consumidor AWS |
-| Self-test do simulador HIL | aprovado em todos os cenários |
-| Compilação Python | aprovada para `poc`, `simulador` e `scripts` |
-| Testes Node | 9/9 aprovados, incluindo persistência e processo HTTP real |
-| Backend | ingestão, deduplicação, limites, health, Prometheus, PWA e shutdown aprovados |
-| Firmware `esp32-hil` | 47.888 B RAM; 787.625 B/slot OTA (50,1%) |
-| Firmware `esp32-fisico` | 47.996 B RAM; 818.353 B/slot OTA (52,0%) |
-| Firmware `esp32-aws` | 49.024 B RAM; 953.429 B/slot OTA (60,6%) |
-| Pinout ESP-WROOM-32 30P | GPIOs usados compatíveis; segundo `VIN` mantido como ambiguidade crítica |
-| Templates AWS | JSON e componentes locais disponíveis; nenhum recurso de conta foi criado |
-| CI | workflow para Python, Node, Compose/Docker e os três builds PlatformIO |
-| Mobile Flutter | app Android/iOS/Web, análise estática, testes e build Web em modo demo |
+| Python | 13/13 testes; contrato, consumidor, CloudFormation e ZIP Lambda |
+| Node/backend | 9/9 testes; API, CORS, segurança, PWA e restore |
+| Flutter | 10/10 testes; `analyze` limpo; Web release e APK piloto |
+| Android | minSdk 24, target/compile 36; APK V2 com certificado debug |
+| Simulador | `--self-test` aprovado |
+| Compose E2E | 2 devices, MQTT conectado/assinado, WS, série e 0 inválidas |
+| Persistência | dois dispositivos e `last_saved_at` restaurados após restart |
+| Firmware HIL | 50.608 B RAM; 788.553 B/slot (50,1%) |
+| Firmware físico | 50.692 B RAM; 819.233 B/slot (52,1%) |
+| Firmware AWS | 51.720 B RAM; 954.301 B/slot (60,7%) |
+| AWS local | template validado; ZIP autocontido e determinístico |
 
-## Funcionalidade entregue
+## Estado por subsistema
 
-- Instaladores PowerShell e POSIX criam a configuração local sem sobrescrever
-  `.env`, constroem a stack e aguardam MQTT e dados antes de concluir.
-- Compose limita a exposição a `127.0.0.1` por padrão, usa volumes persistentes,
-  healthchecks, filesystem somente leitura e serviços reiniciáveis.
-- Backend valida o contrato v1.1, tópico/payload, IDs, faixas e coerência; limita
-  corpo, dispositivos, séries e janela de deduplicação.
-- Persistência JSON versionada, limitada e atômica mantém o estado local entre
-  reinícios sem exigir um banco externo.
-- API REST, WebSocket, `/api/health`, `/api/metricas`, `/metrics` Prometheus e
-  especificação OpenAPI estão disponíveis.
-- Dashboard responsivo possui atualização em tempo real, estados textuais,
-  proteção de DOM, reconexão e instalação PWA com shell offline.
-- Aplicativo Flutter possui conexão configurável, REST/WebSocket com reconexão,
-  histórico, alertas da sessão, diagnóstico do ESP32, temas e modo demonstração.
-- Configurador de firmware gera `secrets.h` sem imprimir senhas e suporta MQTT
-  local ou certificados AWS IoT Core.
-- Firmware implementa QoS 1, ULID, `boot_id`, NTP obrigatório, reconexão não
-  bloqueante, limites de buffer/heap e partições de 4 MB com dois slots OTA.
-- Fonte física inclui SHT31, SGP40/algoritmo VOC, SCD41, PMS7003 e ADC calibrável.
-- EasyEDA Pro e SolidWorks têm roadmaps com gates, BOM/netlist e critérios de
-  fabricação e ensaio, sem fingir que arquivos nativos foram validados.
+- **Firmware 1.3.0:** HAL HIL/físico, NTP, ULID, boot/sequence, QoS 1, LWT,
+  TLS/mTLS, watchdog, limites de heap/payload e fila offline fixa implementados.
+- **Sensores:** drivers SHT31, SGP40, SCD41, PMS7003 e ADC GPIO34 compilam;
+  operação e calibração ainda exigem bancada.
+- **Backend 1.1.0:** contrato, deduplicação/lacunas, snapshot, REST/WS,
+  Prometheus, CORS allowlist, heartbeat e readiness por assinatura concluídos.
+- **Web/PWA:** Agora, Histórico, Alertas e Dispositivo completos, responsivos,
+  live/demo/offline explícitos e shell instalável.
+- **Mobile:** Android/iOS/Web, REST/WS, histórico, alertas, diagnóstico, pinout,
+  temas e demo; APK piloto instalável localmente.
+- **AWS:** IoT Rule, S3, SQS/DLQ, Lambda, DynamoDB, IAM, logs e alarmes em
+  CloudFormation; deployment real continua bloqueado por decisão externa.
+- **PCB/case:** BOM, netlist, regras, parâmetros e roteiros completos; arquivos
+  nativos fabricáveis só podem ser fechados após medir as peças e revisar.
 
-## Limites que continuam exigindo mundo físico ou conta externa
+## Artefatos
 
-- Nenhum sensor foi conectado ou comparado a uma referência nesta execução;
-  compilação não substitui bring-up nem calibração.
-- `lpg_ppm` permanece `null`: o MiCS-5524 não fornece ppm diretamente e a curva
-  depende do componente, breakout, circuito, gás e ensaio reais.
-- O segundo rótulo `VIN` da placa informada é provavelmente `VN/GPIO39`, mas
-  deve ser confirmado por foto, continuidade ou documentação do fabricante.
-- A persistência local é apropriada a uma única instância e retenção curta.
-  PostgreSQL/TimescaleDB continua recomendado para histórico longo, HA e frota.
-- O app Flutter já cobre o uso em primeiro plano. Push em segundo plano, contas,
-  alertas persistentes e publicação nas lojas continuam como evolução.
-- CloudFormation e firmware AWS estão prontos para configuração, mas exigem
-  conta, endpoint, certificados e custos autorizados pelo proprietário.
-- EasyEDA Pro e SolidWorks exigem medidas das peças reais e revisão humana antes
-  de fabricação; documentação textual não equivale a ERC/DRC ou interferência.
-- O sistema é experimental, não é detector certificado nem deve orientar sozinho
-  decisões de emergência ou conformidade ambiental.
+| Arquivo | SHA-256 | Observação |
+|---|---|---|
+| `entrega/mobile/AirSense-piloto-1.0.0-release-debug-signed.apk` | `21862DAFDF4EFD277AB36C81C2FE8853D521FFA9F57D04D9B3A72726A03ADCEC` | piloto; assinatura debug |
+| `entrega/aws/qar-lambda-ingest.zip` | `7ED1D4E4F27A4076C5132EEF4FB4809967928B2FCD3B4423C4BCF0299650A40D` | código Lambda autocontido |
 
-## Definições de estado
+## Gates externos honestamente abertos
 
-- **Implementado e verificado:** teste, build ou smoke test executado.
-- **Implementado; requer bancada:** código compila, mas depende do hardware.
-- **Especificado:** há entradas, passos e critérios para produzir o artefato.
-- **Planejado:** evolução não necessária para a instalação local atual.
+1. confirmar flash/footprint/pinout e trazer sensores na bancada;
+2. calibrar e caracterizar sem converter tensão MiCS em ppm fictício;
+3. produzir e revisar projeto nativo EasyEDA Pro, ERC/DRC e PCB Rev A;
+4. congelar dimensões, modelar SolidWorks e ensaiar fluxo/térmica;
+5. instalar APK em aparelho real, testar acessibilidade e sessão prolongada;
+6. aprovar orçamento/conta, aplicar change set AWS e testar mTLS/DLQ/revogação;
+7. implementar/verificar OTA assinado antes de atualização remota.
+
+“Compilado” e “testado localmente” não significam hardware, nuvem ou produto
+certificado. Consulte [`RELATORIO_VERIFICACAO_FINAL.md`](RELATORIO_VERIFICACAO_FINAL.md)
+e [`PLANO_TESTES.md`](PLANO_TESTES.md).

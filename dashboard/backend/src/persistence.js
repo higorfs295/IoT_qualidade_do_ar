@@ -57,6 +57,8 @@ export function normalizarSnapshot(raw, limites = {}) {
   }
   const m = raw.metricas || {};
   return {
+    savedAt: typeof raw.saved_at === "string" && Number.isFinite(Date.parse(raw.saved_at))
+      ? raw.saved_at : null,
     dispositivos,
     idsVistos,
     metricas: {

@@ -16,6 +16,8 @@
 // bancada antes de interpretar medidas reais.
 // =============================================================================
 #include <Arduino.h>
+#include <esp_idf_version.h>
+#include <esp_task_wdt.h>
 #include "config.h"
 #include "hal/fonte_sensores.h"
 #include "hal/fonte_simulada.h"
@@ -33,6 +35,27 @@ static FonteSensores* fonte = &fonteConcreta;   // a aplicacao so ve a interface
 static PublicadorMqtt publicador;
 static Leitura leitura;
 static unsigned long ultimaPublicacaoMs = 0;
+static bool watchdogAtivo = false;
+
+static void iniciarWatchdog() {
+#if ESP_IDF_VERSION_MAJOR >= 5
+  esp_task_wdt_config_t cfg = {
+    .timeout_ms = WATCHDOG_TIMEOUT_S * 1000U,
+    .idle_core_mask = (1U << portNUM_PROCESSORS) - 1U,
+    .trigger_panic = true,
+  };
+  esp_err_t erro = esp_task_wdt_init(&cfg);
+  if (erro == ESP_ERR_INVALID_STATE) erro = esp_task_wdt_reconfigure(&cfg);
+#else
+  esp_err_t erro = esp_task_wdt_init(WATCHDOG_TIMEOUT_S, true);
+#endif
+  if (erro == ESP_OK || erro == ESP_ERR_INVALID_STATE) {
+    const esp_err_t inscricao = esp_task_wdt_add(nullptr);
+    watchdogAtivo = inscricao == ESP_OK || inscricao == ESP_ERR_INVALID_STATE;
+  }
+  Serial.printf("[watchdog] %s (%us)\n", watchdogAtivo ? "ativo" : "falha",
+                WATCHDOG_TIMEOUT_S);
+}
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
@@ -44,11 +67,13 @@ void setup() {
 
   fonte->iniciar();
   publicador.iniciar();
+  iniciarWatchdog();
 
   Serial.println("Setup concluido. Aguardando leituras...");
 }
 
 void loop() {
+  if (watchdogAtivo) esp_task_wdt_reset();
   // 1) mantem a rede viva (reconecta, processa MQTT)
   publicador.manter();
 
@@ -71,7 +96,11 @@ void loop() {
     Serial.print(leitura.status == STATUS_OK ? "OK"
                : leitura.status == STATUS_DEGRADED ? "DEGRADED" : "ERROR");
     Serial.print(" -> ");
-    Serial.println(ok ? "enviado" : "FALHOU (sem broker?)");
+    Serial.print(ok ? "aceito" : "FALHOU (relogio/heap?)");
+    Serial.print(" fila=");
+    Serial.print(publicador.pendentes());
+    Serial.print(" descartadas=");
+    Serial.println(publicador.descartadas());
   }
 
   delay(10);  // cede CPU; o loop e nao bloqueante

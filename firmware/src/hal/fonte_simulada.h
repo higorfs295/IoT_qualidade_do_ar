@@ -22,6 +22,7 @@ class FonteSimulada : public FonteSensores {
 
   char _buf[LINHA_MAX];
   size_t _len = 0;
+  bool _descartandoLinha = false;
   Leitura _ultima;
   unsigned long _ultimoQuadroMs = 0;
   bool _recebeuAlgum = false;

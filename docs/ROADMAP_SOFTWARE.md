@@ -34,7 +34,8 @@ proporcional ao histórico.
 
 - [ ] TLS/mTLS no broker, ACL por dispositivo e rotação de certificados.
 - [ ] OIDC para usuários, RBAC por site e trilha de auditoria.
-- [ ] Rate limit, política de CORS, logs JSON correlacionados e alertas de SLO.
+- [x] CORS por lista explícita e respostas HTTP endurecidas no backend local.
+- [ ] Rate limit, logs JSON correlacionados e alertas de SLO.
 - [ ] Segredos externos, SBOM, varredura de dependências e threat model.
 - [ ] Alta disponibilidade apenas após teste explícito de failover.
 
@@ -49,11 +50,11 @@ aprovados. A ingestão HTTP continua desabilitada no Compose de produção local
 - [x] Layout responsivo, texto além de cor e aviso de uso experimental.
 - [x] Manifest, ícone, service worker e fallback do shell offline.
 - [x] Conteúdo estático com CSP e sem injeção por identificadores.
+- [x] Páginas dedicadas Agora, Histórico, Alertas e Dispositivo.
 
 ### W1 — experiência de produto
 
 - [ ] Testes e2e em Chromium/Firefox/WebKit e auditoria WCAG/Lighthouse.
-- [ ] Páginas dedicadas de histórico, eventos e inventário de dispositivos.
 - [ ] Fuso configurável, agregações temporais e lacunas visíveis nos gráficos.
 - [ ] Autenticação integrada ao backend B2.
 - [ ] Push opcional somente depois de regras de alerta validadas.

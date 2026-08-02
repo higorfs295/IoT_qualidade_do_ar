@@ -73,17 +73,18 @@ Passos:
 
 ## 4. Robustez e memória
 
-- Fila local de mensagens não publicadas em NVS/flash com limite e desgaste
-  controlado; hoje falhas de publicação são observadas, não persistidas.
-- Watchdog de tarefas e contadores de reset/brownout.
+- [x] Fila circular estática de três mensagens, ordenada, com descarte antigo e
+  contadores; persiste apenas durante o boot atual.
+- [ ] Persistência opcional em NVS/LittleFS com CRC e desgaste controlado.
+- [x] Watchdog de tarefas de 15 s e motivo de reset na telemetria.
 - Partições OTA/rollback já existem; faltam download, assinatura, confirmação
   de boot e rollback automático exercitados.
 - mTLS direto já compila em `esp32-aws`; falta validar com certificado real e
   medir pico de heap do handshake.
 - Provisionamento de identidade por dispositivo/frota sem claim permanente.
 - Persistência opcional do estado do algoritmo VOC, conforme suporte oficial.
-- Telemetria de heap, uptime e reset já existe; acrescentar tensão de alimentação
-  e contador de falhas/reconexões.
+- Telemetria de heap, uptime, reset e perdas offline já existe; acrescentar
+  tensão de alimentação e contador específico de reconexões.
 
 Gates detalhados: [`MEMORIA_ESP32_WROOM32.md`](MEMORIA_ESP32_WROOM32.md).
 
@@ -99,7 +100,7 @@ Gates detalhados: [`MEMORIA_ESP32_WROOM32.md`](MEMORIA_ESP32_WROOM32.md).
 
 ## 6. Critérios de release
 
-- [ ] Os três ambientes compilam sem warning novo relevante.
+- [x] Os três ambientes compilam sem warning novo relevante (02/08/2026).
 - [ ] Teste HIL com quatro cenários e timeout aprovado.
 - [ ] 24 h de execução física sem reset inesperado.
 - [ ] Perda/reordenação explicadas em teste de Wi-Fi/broker.

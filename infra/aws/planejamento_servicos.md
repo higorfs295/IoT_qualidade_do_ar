@@ -1,6 +1,7 @@
 # Planejamento de serviços AWS
 
-Este é um caminho de evolução, não infraestrutura implantada. Antes de criar
+Este caminho já possui IaC e consumidor empacotável, mas não foi implantado.
+Antes de criar
 recursos: definir conta/sandbox, orçamento mensal, tags, região, responsáveis,
 política de retenção e procedimento de destruição segura.
 
@@ -19,14 +20,16 @@ observabilidade -> CloudWatch + alarmes + painel de custo
 
 Arquivos executáveis de referência desta revisão:
 
-- [`sandbox.template.json`](sandbox.template.json): CloudFormation para
-  IoT Rule, SQS/DLQ, S3 bruto, DynamoDB de estado e alarme de DLQ;
+- [`sandbox.template.json`](sandbox.template.json): CloudFormation para IoT
+  Rule, SQS/DLQ, S3 bruto, Lambda, DynamoDB, IAM, logs e alarmes;
 - [`iot-policy-device.example.json`](iot-policy-device.example.json): política
   mínima por Thing/atributo `siteId`;
 - [`iot-rule-sqs.example.json`](iot-rule-sqs.example.json): payload para criar a
   regra isoladamente;
 - [`lambda_ingest/handler.py`](lambda_ingest/handler.py): validação em lote e
   atualização idempotente do estado atual.
+- [`lambda_ingest/package.py`](lambda_ingest/package.py): ZIP determinístico e
+  autocontido para o código da função.
 
 Esses arquivos são templates: não contêm conta, região, endpoint, certificado
 ou chave e não foram aplicados a uma conta AWS nesta revisão.

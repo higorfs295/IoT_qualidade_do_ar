@@ -11,14 +11,14 @@ pio run -e esp32-fisico
 pio run -e esp32-aws
 ```
 
-Os três ambientes foram compilados na auditoria de 31/07/2026. A coluna flash
+Os três ambientes foram recompilados na auditoria de 02/08/2026. A coluna flash
 usa cada slot OTA de 1.572.864 bytes, não os 4 MB inteiros:
 
 | Ambiente | RAM | Flash |
 |---|---:|---:|
-| `esp32-hil` | 47.888 B (14,6%) | 787.625 B (50,1%) |
-| `esp32-fisico` | 47.996 B (14,6%) | 818.353 B (52,0%) |
-| `esp32-aws` | 49.024 B (15,0%) | 953.429 B (60,6%) |
+| `esp32-hil` | 50.608 B (15,4%) | 788.553 B (50,1%) |
+| `esp32-fisico` | 50.692 B (15,5%) | 819.233 B (52,1%) |
+| `esp32-aws` | 51.720 B (15,8%) | 954.301 B (60,7%) |
 
 Compilado não significa validado eletricamente. O ambiente físico requer o
 bring-up de [`../docs/ROADMAP_FIRMWARE.md`](../docs/ROADMAP_FIRMWARE.md).
@@ -78,7 +78,8 @@ mantém `sensor_status=DEGRADED`, sem fabricar uma precisão inexistente.
 
 - Biblioteca MQTT com publicação QoS 1 real.
 - ULID canônico por mensagem e `boot_id` por inicialização.
-- `sequence` MQTT cresce durante o boot; consumidores usam `boot_id` para reset.
+- `sequence` cresce durante o boot e só é consolidada depois de publicação ou
+  entrada aceita na fila; consumidores usam `boot_id` para detectar reinício.
 - NTP obrigatório: sem hora válida o firmware não publica data 1970.
 - Last Will retido em `.../status` e reconexão com intervalo.
 - Credenciais fora do código versionado.
@@ -86,6 +87,9 @@ mantém `sensor_status=DEGRADED`, sem fabricar uma precisão inexistente.
   abaixo do mínimo configurado.
 - Metadados de heap livre/mínimo/maior bloco, uptime e motivo de reset.
 - Tópicos e ULIDs em buffers fixos para reduzir fragmentação.
+- Watchdog de tarefas de 15 s compatível com ESP-IDF atual.
+- Fila circular em RAM de três mensagens, sem alocação dinâmica: preserva ordem,
+  descarta a mais antiga ao lotar e publica profundidade/perdas em `metadata`.
 
 ## Flash, OTA e memória
 
@@ -123,8 +127,10 @@ src/hal/fonte_fisica.{h,cpp}
 src/net/publicador_mqtt.{h,cpp}
 ```
 
-## Próximas evoluções
+## Próximos gates
 
-Persistência limitada de mensagens, watchdog, cliente OTA assinado/rollback,
-secure boot/flash encryption quando aplicável, provisionamento de frota e
-calibração registrada. Critérios no roadmap de firmware.
+A fila atual protege interrupções curtas, mas não sobrevive a reset. Antes de um
+piloto remoto, decidir e ensaiar persistência em flash com CRC/desgaste. Também
+restam cliente OTA assinado/rollback exercitado, secure boot/flash encryption
+quando aplicável, provisionamento de frota, calibração registrada e soak físico.
+Critérios no roadmap de firmware.

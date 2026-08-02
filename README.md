@@ -1,269 +1,265 @@
-# Estação IoT de Qualidade do Ar
+# Air Sense — estação IoT de qualidade do ar
 
-Estação experimental baseada no **DevKit USB-C de 30 pinos com módulo Wi-Fi
-ESP-WROOM-32** para monitorar CO₂, partículas, VOC,
-temperatura e umidade, com firmware alternável entre sensores simulados
-(Hardware-in-the-Loop) e físicos, telemetria MQTT, ingestão em tempo real e
-dashboard web.
+Projeto integrado para monitorar CO₂, partículas, VOC, temperatura e umidade
+com um **ESP32 DevKit USB-C de 30 pinos equipado com ESP-WROOM-32**. A base
+inclui firmware HIL/físico/AWS, simulador, MQTT, backend, dashboard web/PWA,
+aplicativo Flutter, infraestrutura local e CloudFormation para AWS.
 
-> **Escopo de segurança:** este é um protótipo acadêmico/experimental. Não é um
-> detector certificado de gás, fumaça ou incêndio e não substitui instrumentos
-> calibrados, alarmes regulamentares nem orientação profissional. O canal
-> analógico MiCS publica tensão bruta; `lpg_ppm` só pode ser habilitado depois de
-> calibração rastreável do conjunto físico.
+> **Segurança:** é um protótipo acadêmico/experimental. Não substitui detector
+> certificado de gás, fumaça ou incêndio, instrumento calibrado, alarme
+> regulamentar ou orientação profissional. O MiCS-5524 publica `gas_raw_v`;
+> `lpg_ppm` permanece nulo até existir calibração rastreável do conjunto real.
 
-## Instalação recomendada — stack funcional em um comando
+## Comece por aqui
 
-Pré-requisito único para a aplicação local: **Docker Desktop/Engine com Docker
-Compose v2**. O instalador cria `.env` sem sobrescrever configurações existentes,
-constrói as imagens, inicia o broker, backend, dashboard e três dispositivos de
-demonstração, e só termina quando dados reais do MQTT aparecem na API.
-
-Windows PowerShell:
+Para executar a solução local completa, instale Docker Desktop/Engine com
+Compose e rode:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 
-Linux/macOS:
+Em Linux/macOS:
 
 ```bash
 sh ./scripts/install.sh
 ```
 
-Ou diretamente:
+O instalador cria `.env` a partir de `.env.example`, constrói as imagens e só
+conclui depois que broker, backend e dispositivos demonstrativos aparecem na
+API. Abra **http://localhost:3001**.
+
+Execução manual equivalente:
 
 ```bash
-cp .env.example .env          # no PowerShell: Copy-Item .env.example .env
+cp .env.example .env
 docker compose up -d --build
-```
-
-Abra **http://localhost:3001**. O painel recebe dados MQTT automaticamente e
-pode ser instalado como PWA no computador ou celular. O backend preserva estado,
-séries curtas e contadores no volume `backend_data` entre reinícios.
-
-Comandos operacionais:
-
-```bash
 docker compose ps
 docker compose logs -f backend demo
-docker compose restart
-docker compose down           # preserva os volumes
-docker compose down -v        # apaga conscientemente todos os dados locais
 ```
 
-Por padrão MQTT e dashboard ficam vinculados a `127.0.0.1`. Para um ESP32 na
-rede local, altere `BIND_ADDRESS=0.0.0.0` no `.env`, permita apenas a rede local
-no firewall e use o IP do computador como `MQTT_HOST`.
+Por padrão, MQTT e dashboard escutam apenas em `127.0.0.1`. Para conectar um
+ESP32 ou celular da LAN, use `BIND_ADDRESS=0.0.0.0`, libere somente a rede local
+no firewall e configure o IP do computador no dispositivo/app. O listener 1883
+anônimo é destinado exclusivamente a laboratório isolado.
 
-## Estado da versão final da base
+## Entregáveis prontos
 
-| Parte | Estado verificável | Próximo gate |
-|---|---|---|
-| Firmware HIL | implementado e compilado | flash no ESP32 + teste serial |
-| Firmware físico | implementado e compilado | bancada sensor a sensor + calibração |
-| Firmware AWS | TLS/mTLS implementado e compilado | certificado real + IoT Core sandbox |
-| Simulador HIL | implementado; self-test aprovado | teste com porta serial real |
-| Contrato v1.1 | validadores Python/Node e testes aprovados | compatibilidade em bancada |
-| Backend | MQTT/API/WS, persistência atômica, healthcheck e métricas | autenticação multiusuário, se exposto |
-| Dashboard web/PWA | funcional, responsivo, instalável e offline | notificações push opcionais |
-| Broker/PoC de carga | configuração e gerador disponíveis | benchmark reproduzido na máquina-alvo |
-| PCB | especificação, BOM, netlist e roteiro completos | esquemático/PCB no EasyEDA + revisão elétrica |
-| Case | roteiro paramétrico completo | medir montagem e modelar no SolidWorks |
-| Mobile Flutter | implementado, testado e integrado à API/WS | piloto Android/iOS em aparelho físico |
+| Área | Resultado atual |
+|---|---|
+| Firmware | HIL, sensores físicos e AWS TLS/mTLS compilados para ESP-WROOM-32; watchdog e fila offline fixa |
+| Sensores | SHT31, SGP40, SCD41, PMS7003 e canal ADC GPIO34 implementados; validação elétrica ainda exige bancada |
+| Backend | MQTT QoS 1, contrato v1.1, deduplicação, lacunas, persistência atômica, REST, WebSocket e Prometheus |
+| Web/PWA | telas Agora, Histórico, Alertas e Dispositivo; live, demo identificada, offline shell e layout responsivo |
+| Mobile | Flutter Android/iOS/Web com REST, WebSocket, histórico, alertas, diagnóstico, pinout e modo demo |
+| Infra local | Compose com Mosquitto, backend, dashboard e gerador; restauração após reinício validada |
+| AWS | CloudFormation com IoT Rule, SQS/DLQ, Lambda, S3, DynamoDB, IAM, logs e alarmes; pacote Lambda gerado |
+| Hardware | pinout, BOM, netlist, regras e roteiro EasyEDA Pro; fabricação depende das medições físicas |
+| Case | parâmetros e roteiro SolidWorks; CAD nativo depende da PCB congelada e de dimensões medidas |
 
-Detalhes e evidências: [`docs/STATUS_PROJETO.md`](docs/STATUS_PROJETO.md).
+Entregáveis instaláveis e relatório estão em [`entrega/`](entrega/). O APK de
+piloto usa assinatura de depuração e **não deve ser enviado à Play Store**.
+A apresentação final editável está em
+[`entrega/Apresentacao_Final_Air_Sense.pptx`](entrega/Apresentacao_Final_Air_Sense.pptx).
+
+## Evidências da revisão final
+
+Auditoria executada em 2 de agosto de 2026:
+
+- 13 testes Python aprovados, incluindo contrato, Lambda e pacote AWS;
+- 9 testes Node aprovados, com API, CORS, PWA e persistência após reinício;
+- 10 testes Flutter aprovados e `flutter analyze` sem ocorrência;
+- Flutter Web release e APK Android release de piloto gerados;
+- três builds PlatformIO aprovados;
+- Compose validado e pilha isolada exercitada com 2 dispositivos, WebSocket,
+  séries, zero mensagens inválidas e restauração do snapshot;
+- simulador HIL aprovado no `--self-test`;
+- JSON/XML/links locais e artefatos estruturados verificados.
+
+Tamanhos do firmware por slot OTA de 1.572.864 bytes:
+
+| Ambiente | RAM | Flash/slot |
+|---|---:|---:|
+| `esp32-hil` | 50.608 B (15,4%) | 788.553 B (50,1%) |
+| `esp32-fisico` | 50.692 B (15,5%) | 819.233 B (52,1%) |
+| `esp32-aws` | 51.720 B (15,8%) | 954.301 B (60,7%) |
+
+O relatório completo separa “testado”, “compilado” e “dependente do mundo
+físico/conta externa”: [`docs/RELATORIO_VERIFICACAO_FINAL.md`](docs/RELATORIO_VERIFICACAO_FINAL.md).
 
 ## Arquitetura
 
 ```text
 Central HIL (PC) --NDJSON/USB--┐
-                              ├--> ESP32/HAL --> MQTT QoS 1 --> Mosquitto/backend/web
-Sensores físicos I2C/UART/ADC-┘                            |
-                                                            +--> AWS IoT Core
-                                                                 |-- Rule -> SQS/DLQ
-                                                                 |-- S3 bruto
-                                                                 +-- consumidor -> DynamoDB
+                              ├─> ESP32/HAL ─> MQTT QoS 1 ─> Mosquitto
+Sensores I²C/UART/ADC --------┘                         │
+                                                       ├─> backend ─> Web/PWA
+                                                       │            └─> Flutter
+                                                       └─> AWS IoT Core (mTLS)
+                                                            └─> Rule ─> SQS ─> Lambda ─> DynamoDB
+                                                                    ├─> DLQ
+                                                                    └─> S3 bruto
 ```
 
-O padrão Strategy mantém a aplicação independente da fonte dos sensores. O
-ambiente `esp32-hil` lê quadros do simulador; `esp32-fisico` lê SHT31, SGP40,
-SCD41, PMS7003 e a entrada analógica; `esp32-aws` adiciona TLS/mTLS para o IoT
-Core. Todos geram o mesmo payload v1.1.
+O padrão HAL/Strategy mantém a aplicação independente da fonte. Os ambientes
+`esp32-hil`, `esp32-fisico` e `esp32-aws` produzem o mesmo contrato v1.1.
 
-## Execução de desenvolvimento sem Docker
+## Firmware ESP-WROOM-32
 
-Pré-requisitos: Python 3.10+ e Node.js 20+.
-
-```bash
-# Terminal 1: backend + dashboard (persistência opcional com DATA_DIR)
-cd dashboard/backend
-npm ci
-MQTT_ENABLED=false DATA_DIR=./data npm start
-
-# Abra http://localhost:3001. Sem dados, o front pode operar em modo mock.
-
-# Validar o gerador HIL sem ESP32
-python simulador/central_sensores.py --self-test
-python simulador/central_sensores.py --dry-run --cenario auto --duracao 10
-
-# Testes automatizados
-python -m unittest discover -s poc/tests -v
-cd dashboard/backend && npm test
-```
-
-## Fluxo MQTT manual
-
-```bash
-# Terminal 1 - broker
-cd infra/server_config
-docker compose up -d mosquitto
-
-# Terminal 2 - backend
-cd dashboard/backend
-npm ci && npm start
-
-# Terminal 3 - poucos dispositivos virtuais
-cd poc
-python -m pip install -r requirements.txt
-python ingestao_teste.py --host localhost --sensores 5 --gateways 1 \
-  --intervalo 3 --duracao 60
-```
-
-O dashboard fica em `http://localhost:3001`. O listener 1883 é anônimo e só
-deve ser usado em rede local isolada.
-
-## Firmware ESP32
-
-1. Gere `firmware/include/secrets.h` sem editar C/C++ nem exibir senhas:
+Gere `firmware/include/secrets.h` sem colocar credenciais no Git:
 
 ```bash
 python scripts/configure_firmware.py --ssid MINHA_REDE \
-  --mqtt-host 192.168.1.10 --device-id esp32-sala-01 --site-id minha-casa
+  --mqtt-host 192.168.1.10 --device-id esp32-sala-01 --site-id campus-ufg
 ```
 
-O script pede a senha Wi-Fi sem eco. Para AWS, acrescente `--aws`, porta 8883,
-CA, certificado e chave exclusivos; veja `python scripts/configure_firmware.py --help`.
+Compile e grave:
 
-2. Compile um dos ambientes:
 ```bash
 cd firmware
 pio run -e esp32-hil
 pio run -e esp32-fisico
 pio run -e esp32-aws
+pio run -e esp32-hil -t upload
 ```
 
-3. Para HIL, grave o primeiro ambiente e execute:
+Teste HIL por USB:
 
 ```bash
-pio run -e esp32-hil -t upload
 python ../simulador/central_sensores.py --porta COM5 --cenario auto
 ```
 
-O firmware só publica depois de obter horário NTP válido, usa ULID canônico,
-inclui `boot_id` e publica com QoS 1 real. Instruções completas:
-[`firmware/README.md`](firmware/README.md) e
-[`docs/ROADMAP_FIRMWARE.md`](docs/ROADMAP_FIRMWARE.md).
+Características de robustez: NTP obrigatório, ULID, `boot_id`, sequência por
+boot, QoS 1, LWT, TLS/mTLS, gate de heap, payload máximo de 896 bytes, watchdog
+de 15 s, parser serial limitado e fila offline circular de três mensagens. Se a
+fila encher, a mais antiga é descartada e o total fica em
+`metadata.offline_dropped_total`.
 
-Pinagem consolidada: GPIO21/22 para I²C, GPIO16/17 para PMS7003 e GPIO34/ADC1
-para o canal analógico. O segundo `VIN` informado é **VN/GPIO39 provável** e
-não deve receber 5 V antes de confirmação física:
-[`docs/PINOUT_ESP32_WROOM32_30P.md`](docs/PINOUT_ESP32_WROOM32_30P.md).
+Pinagem usada:
 
-## Contrato de telemetria
+| Função | Serigrafia | GPIO |
+|---|---|---:|
+| I²C SDA/SCL | D21/D22 | 21/22 |
+| PMS7003 RX/TX do ESP32 | D16/D17 | 16/17 |
+| MiCS ADC | D34 | 34/ADC1_CH6 |
+| HIL/upload/log | RX0/TX0 | 3/1 |
 
-Tópico:
+O segundo `VIN` informado na placa é tratado como **VN/GPIO39 provável** e não
+pode receber alimentação sem confirmação por continuidade. Veja
+[`docs/PINOUT_ESP32_WROOM32_30P.md`](docs/PINOUT_ESP32_WROOM32_30P.md) e
+[`firmware/README.md`](firmware/README.md).
+
+## Dashboard e API
+
+Desenvolvimento sem Docker:
+
+```bash
+cd dashboard/backend
+npm ci
+MQTT_ENABLED=false ENABLE_HTTP_INGEST=true DATA_DIR=./data npm start
+```
+
+Recursos principais:
+
+| Recurso | Uso |
+|---|---|
+| `GET /api/health` | processo, MQTT/assinatura e persistência |
+| `GET /api/info` | versão da API, schemas e campos históricos |
+| `GET /api/dispositivos` | dispositivos e último estado |
+| `GET /api/dispositivos/:id/serie` | série limitada por grandeza |
+| `GET /api/metricas` / `GET /metrics` | métricas JSON/Prometheus |
+| `WS /ws` | telemetria em tempo real |
+| `POST /api/ingest` | somente desenvolvimento, desabilitado no Compose de produção |
+
+Para Flutter Web em outra origem, configure `CORS_ORIGINS` como lista explícita
+separada por vírgulas. A especificação está em [`docs/openapi.yaml`](docs/openapi.yaml).
+
+## Aplicativo mobile
+
+O APK piloto está em
+[`entrega/mobile/AirSense-piloto-1.0.0-release-debug-signed.apk`](entrega/mobile/AirSense-piloto-1.0.0-release-debug-signed.apk).
+Na primeira abertura, informe:
+
+- emulador Android: `http://10.0.2.2:3001`;
+- aparelho físico: `http://IP_DO_COMPUTADOR:3001`;
+- Web/iOS Simulator: `http://localhost:3001`.
+
+Para desenvolver:
+
+```bash
+cd mobile
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --release
+flutter build web --release
+```
+
+O release local usa a chave debug quando `android/key.properties` não existe.
+Para distribuição, use keystore privado e backend HTTPS/WSS. Detalhes em
+[`mobile/README.md`](mobile/README.md).
+
+## AWS
+
+O firmware `esp32-aws` conecta diretamente ao endpoint ATS com certificado por
+Thing. A infraestrutura reproduzível está em
+[`infra/aws/sandbox.template.json`](infra/aws/sandbox.template.json), e o ZIP do
+consumidor em [`entrega/aws/qar-lambda-ingest.zip`](entrega/aws/qar-lambda-ingest.zip).
+
+O projeto **não cria recursos automaticamente**: conta, região, orçamento,
+bucket de artefatos e aprovação de custo precisam ser escolhidos pelo responsável.
+Passo a passo: [`infra/aws/lambda_ingest/README.md`](infra/aws/lambda_ingest/README.md).
+
+## Hardware e case
+
+Não foram fabricados arquivos EasyEDA/SolidWorks “de aparência pronta” porque
+o footprint do DevKit, o conector PMS7003 e o envelope mecânico ainda dependem
+das peças físicas. Inventar essas dimensões tornaria a placa/case incorretos.
+Estão prontos:
+
+- [`docs/ROADMAP_HARDWARE_EASYEDA.md`](docs/ROADMAP_HARDWARE_EASYEDA.md): esquemático, bibliotecas, PCB, DRC e fabricação;
+- [`hardware/pcb/`](hardware/pcb/): BOM, netlist, regras, pinout e checklist;
+- [`docs/ROADMAP_CASE_SOLIDWORKS.md`](docs/ROADMAP_CASE_SOLIDWORKS.md): skeleton, base, tampa, dutos, DFM e ensaios;
+- [`hardware/case/parametros.csv`](hardware/case/parametros.csv): dimensões a medir antes do CAD.
+
+## Estrutura
 
 ```text
-qualidade-ar/{site_id}/{device_id}/telemetria
+firmware/       firmware ESP32 HIL/físico/AWS
+simulador/      central virtual de sensores por USB
+poc/            gerador de carga, contrato e sink Python
+dashboard/      backend Node e Web/PWA
+mobile/         aplicativo Flutter Android/iOS/Web
+infra/          Mosquitto/ThingsBoard e CloudFormation AWS
+hardware/       especificações de PCB e case
+scripts/        instalação e configuração segura
+docs/           contrato, testes, roadmaps, status e relatórios
+entrega/        APK, pacote Lambda e apresentação final
 ```
 
-Payload resumido:
+## Documentação essencial
 
-```json
-{
-  "schema_version": "1.1",
-  "message_id": "01JQ7PK0P3R7V5BT7P0Q9YQ8A1",
-  "device_id": "esp32-sala-01",
-  "site_id": "campus-ufg",
-  "sent_at": "2026-07-31T12:00:00.000Z",
-  "sequence": 1,
-  "measurements": {
-    "co2_ppm": 620,
-    "voc_index": 102,
-    "lpg_ppm": null,
-    "pm1_ugm3": 5.0,
-    "pm25_ugm3": 9.0,
-    "pm10_ugm3": 14.0,
-    "temperature_c": 24.2,
-    "humidity_pct": 51.0,
-    "gas_raw_v": 2.1
-  },
-  "quality": { "gas_status": "SAFE", "sensor_status": "DEGRADED" },
-  "metadata": {
-    "firmware_version": "1.2.0",
-    "boot_id": "01JQ7PK0P3R7V5BT7P0Q9YQ8A2",
-    "board_model": "ESP-WROOM-32 DevKit 30P USB-C"
-  }
-}
-```
+- [`docs/STATUS_PROJETO.md`](docs/STATUS_PROJETO.md) — estado por componente;
+- [`docs/PLANO_TESTES.md`](docs/PLANO_TESTES.md) — matriz e critérios de aceite;
+- [`docs/CONTRATO_TELEMETRIA.md`](docs/CONTRATO_TELEMETRIA.md) — contrato v1.1;
+- [`docs/ROADMAP_GERAL.md`](docs/ROADMAP_GERAL.md) — caminho crítico até o piloto;
+- [`docs/ROADMAP_FIRMWARE.md`](docs/ROADMAP_FIRMWARE.md) — bancada, calibração e release;
+- [`docs/ROADMAP_SOFTWARE.md`](docs/ROADMAP_SOFTWARE.md) — backend, web, mobile e AWS;
+- [`docs/MEMORIA_ESP32_WROOM32.md`](docs/MEMORIA_ESP32_WROOM32.md) — flash/heap/OTA;
+- [`ARQUITETURA.md`](ARQUITETURA.md) — arquitetura distribuída e histórico da PoC;
+- [`BASE_FINAL.md`](BASE_FINAL.md) — blueprint consolidado do produto.
 
-Campos de medição podem ser `null` quando indisponíveis, mas um payload com
-`sensor_status: "OK"` não pode conter medida obrigatória nula. Especificação:
-[`docs/CONTRATO_TELEMETRIA.md`](docs/CONTRATO_TELEMETRIA.md).
+## O que ainda exige validação externa
 
-## Estrutura do repositório
+Software compilado não equivale a produto físico certificado. A conclusão do
+protótipo requer: confirmar a placa de 4 MB e o footprint 1:1, revisar
+esquemático por segunda pessoa, ERC/DRC, testar alimentação sob pico, trazer
+sensores um a um, calibrar/compare com referências, validar o case térmico e de
+fluxo, instalar APK em aparelho real e executar o sandbox AWS com orçamento e
+certificado autorizados. Os gates estão no plano de testes.
 
-```text
-firmware/       ESP32, HAL HIL/física e MQTT
-simulador/      central de sensores via Serial/USB
-poc/            gerador de carga e consumidor MQTT em Python
-dashboard/      backend Node e painel web
-infra/          Mosquitto, ThingsBoard e plano de nuvem
-compose.yaml    stack local pronta com persistência e dados de demonstração
-scripts/        instaladores e configurador seguro do firmware
-hardware/pcb/   especificação elétrica/EasyEDA Pro
-hardware/case/  especificação mecânica/SolidWorks
-mobile/         app Flutter Android/iOS/Web, testes e documentação
-docs/           contrato, status, testes, roadmaps e artefatos finais
-```
+## Contexto
 
-## Roadmaps e documentação final
-
-- [`docs/ROADMAP_GERAL.md`](docs/ROADMAP_GERAL.md) — sequência de execução e gates.
-- [`docs/ROADMAP_FIRMWARE.md`](docs/ROADMAP_FIRMWARE.md) — bring-up, calibração e release.
-- [`docs/ROADMAP_SOFTWARE.md`](docs/ROADMAP_SOFTWARE.md) — backend, web, mobile e nuvem.
-- [`mobile/docs/ROADMAP_MOBILE.md`](mobile/docs/ROADMAP_MOBILE.md) — piloto, AWS, operação remota e publicação.
-- [`docs/ROADMAP_HARDWARE_EASYEDA.md`](docs/ROADMAP_HARDWARE_EASYEDA.md) — esquemático e PCB no EasyEDA Pro.
-- [`docs/ROADMAP_CASE_SOLIDWORKS.md`](docs/ROADMAP_CASE_SOLIDWORKS.md) — case paramétrico no SolidWorks.
-- [`docs/PINOUT_ESP32_WROOM32_30P.md`](docs/PINOUT_ESP32_WROOM32_30P.md) — pinout e restrições GPIO.
-- [`docs/MEMORIA_ESP32_WROOM32.md`](docs/MEMORIA_ESP32_WROOM32.md) — flash, OTA, heap e buffers.
-- [`docs/PLANO_TESTES.md`](docs/PLANO_TESTES.md) — matriz de verificação e aceite.
-- [`docs/estimativa_carga.md`](docs/estimativa_carga.md) — volumetria e fórmulas.
-- [`docs/estimativa_carga.xlsx`](docs/estimativa_carga.xlsx) — calculadora editável com cenários e gráfico.
-- [`docs/arquitetura_solucao.pdf`](docs/arquitetura_solucao.pdf) — dossiê técnico diagramado em 10 páginas.
-- [`docs/apresentacao_slides.pdf`](docs/apresentacao_slides.pdf) — apresentação executiva em 12 páginas.
-- [`docs/telemetria-v1.1.schema.json`](docs/telemetria-v1.1.schema.json) — JSON Schema do contrato.
-- [`docs/openapi.yaml`](docs/openapi.yaml) — contrato OpenAPI da API local.
-- [`docs/modelagem_dados.json`](docs/modelagem_dados.json) — modelo lógico para a persistência.
-- [`infra/aws/planejamento_servicos.md`](infra/aws/planejamento_servicos.md) — IoT Core, SQS/DLQ, S3 e DynamoDB.
-- [`ARQUITETURA.md`](ARQUITETURA.md) — histórico detalhado da PoC de ingestão.
-- [`BASE_FINAL.md`](BASE_FINAL.md) — blueprint original da evolução do projeto.
-
-Os PDFs podem ser regenerados por `python docs/tools/build_pdfs.py` em um
-ambiente com ReportLab instalado. A planilha tem fonte reproduzível em
-`docs/tools/build_estimativa_carga.mjs` e usa `@oai/artifact-tool`.
-
-## Critério de conclusão do produto físico
-
-A base de software está compilável e testada, mas o produto só deve ser chamado
-de “validado” após: revisão do esquemático por outra pessoa, ERC/DRC sem erros,
-teste de alimentação com carga, bring-up individual dos sensores, comparação
-com referências, ensaio térmico do case, teste de perda/reconexão MQTT e registro
-dos resultados conforme [`docs/PLANO_TESTES.md`](docs/PLANO_TESTES.md).
-
-## Autoria e contexto
-
-Projeto acadêmico da UFG, disciplina de Internet das
-Coisas. A documentação preserva o histórico das atividades anteriores e separa
-explicitamente resultados reproduzidos nesta revisão de resultados históricos.
+Projeto acadêmico da UFG para a disciplina de Internet das Coisas. A base
+separa explicitamente resultado automatizado, compilação, validação local,
+teste físico e implantação em nuvem para evitar alegações além das evidências.

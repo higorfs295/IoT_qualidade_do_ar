@@ -12,6 +12,7 @@ static bool numero(JsonVariantConst v) {
 void FonteSimulada::iniciar() {
   _ultima.limpar();
   _len = 0;
+  _descartandoLinha = false;
   // A Serial ja foi iniciada no main (Serial.begin). Aqui nada de I2C/UART.
   // O PC escreve os quadros na RX; os logs do firmware saem pela TX — mesmo
   // cabo, direcoes independentes, sem colisao.
@@ -76,15 +77,23 @@ bool FonteSimulada::atualizar(Leitura& out) {
   while (Serial.available() > 0) {
     char c = (char)Serial.read();
     if (c == '\n' || c == '\r') {
-      if (_len > 0) {
+      if (_descartandoLinha) {
+        _descartandoLinha = false;
+        _len = 0;
+      } else if (_len > 0) {
         _buf[_len] = '\0';
         processarLinha(_buf);
         _len = 0;
       }
+    } else if (_descartandoLinha) {
+      continue;
     } else if (_len < LINHA_MAX - 1) {
       _buf[_len++] = c;
     } else {
-      _len = 0;  // linha longa demais: descarta para nao estourar o buffer
+      // Descarta ate o fim do quadro. Reiniciar _len e aceitar o sufixo faria
+      // uma linha excessiva parecer um novo JSON valido.
+      _len = 0;
+      _descartandoLinha = true;
     }
   }
 

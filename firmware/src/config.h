@@ -40,7 +40,7 @@
 #ifndef SITE_ID
 #define SITE_ID          "campus-ufg-bloco-inf"
 #endif
-#define FIRMWARE_VERSION "1.2.0"
+#define FIRMWARE_VERSION "1.3.0"
 #define BOARD_MODEL      "ESP-WROOM-32 DevKit 30P USB-C"
 #define HARDWARE_REVISION "PROTO-REV-A"
 
@@ -54,6 +54,8 @@
 #define MQTT_PAYLOAD_MAX 896
 #define MQTT_TOPIC_MAX   160
 #define MIN_FREE_HEAP_BYTES 30000UL
+#define MQTT_OFFLINE_QUEUE_SIZE 3
+#define WATCHDOG_TIMEOUT_S 15
 // #define MQTT_TLS                       // descomente p/ TLS 8883 (carregar CA)
 
 // -----------------------------------------------------------------------------

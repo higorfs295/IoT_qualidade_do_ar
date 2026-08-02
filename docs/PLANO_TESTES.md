@@ -9,6 +9,8 @@
 | SW-01 | Python | `unittest discover` | log | todos passam |
 | SW-02 | Node | `npm test` | log | todos passam |
 | SW-03 | API/PWA | processo real | respostas/headers | API, manifest, SW e métricas corretos |
+| MOB-01 | Flutter | analyze/test/build | logs/APK/Web | sem issues; APK/Web gerados |
+| AWS-00 | IaC local | template/pacote Lambda | testes/hash ZIP | referências válidas e ZIP autocontido |
 | FW-01 | firmware | build HIL/físico/AWS | resumo PIO | três success; flash < 80% |
 | FW-02 | memória | TLS + publicação/soak | heap mínimo/reset | heap >= 30 kB; sem reset |
 | HIL-01 | serial | 4 cenários + timeout | payload/log | estado correto |
@@ -29,7 +31,8 @@ Na raiz do repositório:
 ```bash
 python -m unittest discover -s poc/tests -v
 python simulador/central_sensores.py --self-test
-python -m compileall -q poc simulador scripts
+python -m compileall -q poc simulador scripts infra/aws/lambda_ingest
+python infra/aws/lambda_ingest/package.py --output entrega/aws/qar-lambda-ingest.zip
 
 cd dashboard/backend
 npm ci
@@ -40,13 +43,26 @@ cd ../..
 docker compose config --quiet
 docker compose build backend demo
 
+cd mobile
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --release
+flutter build web --release
+
 cd firmware
 pio run -e esp32-hil -e esp32-fisico -e esp32-aws
 ```
 
-Base auditada em 2 de agosto de 2026: 11 testes Python, 9 testes Node e os três
-ambientes PlatformIO aprovados. O workflow em `.github/workflows/ci.yml` repete
-essas verificações em Linux.
+Base auditada em 2 de agosto de 2026: 13 testes Python, 9 testes Node, 10 testes
+Flutter, análise Flutter sem ocorrência, APK/Web gerados e os três ambientes
+PlatformIO aprovados. O workflow em `.github/workflows/ci.yml` repete as suítes
+reproduzíveis em Linux; instalação em aparelho, bancada e conta AWS permanecem
+gates externos.
+
+O Android foi compilado com Flutter 3.44.6/Dart 3.12.2, JDK 21 e SDK Android em
+`E:\Android_SDk` (compile/target SDK 36, minSdk 24). O APK piloto foi verificado
+com assinatura V2 de depuração; para loja, gerar keystore de release separado.
 
 ## Aceite da instalação local
 

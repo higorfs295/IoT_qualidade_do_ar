@@ -1,5 +1,5 @@
 /* config.js — configuracao do painel.
- * MODO: 'auto' tenta o backend real e cai para mock se ele nao responder;
+ * MODO: 'auto' tenta o backend real e mostra demo identificada se ele falhar;
  *       'live' forca o backend; 'mock' simula no navegador (bom p/ demonstrar).
  * (herda a ideia do config.js do IoT-IDEA)
  */

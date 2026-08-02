@@ -44,6 +44,7 @@ function iniciar(porta, dataDir) {
       ...process.env, PORT: String(porta), HOST: "127.0.0.1",
       MQTT_ENABLED: "false", ENABLE_HTTP_INGEST: "true",
       DATA_DIR: dataDir, PERSIST_INTERVAL_MS: "50",
+      CORS_ORIGINS: "https://painel.example",
     },
     stdio: "ignore",
   });
@@ -78,11 +79,44 @@ test("API, PWA e persistencia sobrevivem ao reinicio", async () => {
     processo = iniciar(porta, dataDir);
     const restaurados = await esperar(`${base}/api/dispositivos`, (d) => d.length === 1);
     assert.equal(restaurados[0].device_id, JSON.parse(payload).device_id);
+    const healthRestaurado = await (await fetch(`${base}/api/health`)).json();
+    assert.match(healthRestaurado.persistence_last_saved_at, /^\d{4}-\d{2}-\d{2}T/);
     const manifest = await fetch(`${base}/manifest.webmanifest`);
     assert.match(manifest.headers.get("content-type"), /manifest\+json/);
     assert.equal((await fetch(`${base}/sw.js`)).status, 200);
     const prometheus = await (await fetch(`${base}/metrics`)).text();
     assert.match(prometheus, /qar_devices 1/);
+
+    const info = await (await fetch(`${base}/api/info`)).json();
+    assert.equal(info.api_version, "1.1.0");
+    assert.ok(info.series_fields.includes("co2_ppm"));
+
+    const campoInvalido = await fetch(
+      `${base}/api/dispositivos/${encodeURIComponent(restaurados[0].device_id)}/serie?campo=__proto__`,
+    );
+    assert.equal(campoInvalido.status, 400);
+
+    const metodoInvalido = await fetch(`${base}/api/health`, { method: "POST" });
+    assert.equal(metodoInvalido.status, 405);
+    assert.equal(metodoInvalido.headers.get("allow"), "GET");
+
+    const caminhoInvalido = await fetch(`${base}/api/dispositivos/%E0%A4%A/atual`);
+    assert.equal(caminhoInvalido.status, 400);
+    assert.equal((await fetch(`${base}/api/health`)).status, 200);
+
+    const cors = await fetch(`${base}/api/health`, {
+      headers: { Origin: "https://painel.example" },
+    });
+    assert.equal(cors.headers.get("access-control-allow-origin"), "https://painel.example");
+    const preflight = await fetch(`${base}/api/health`, {
+      method: "OPTIONS",
+      headers: { Origin: "https://painel.example" },
+    });
+    assert.equal(preflight.status, 204);
+
+    const index = await (await fetch(base)).text();
+    assert.match(index, /Histórico/);
+    assert.match(index, /Dispositivo e infraestrutura/);
   } finally {
     await parar(processo);
     await rm(dataDir, { recursive: true, force: true });

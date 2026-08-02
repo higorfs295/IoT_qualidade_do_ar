@@ -1,4 +1,4 @@
-const CACHE = "qar-shell-v1";
+const CACHE = "air-sense-shell-v3";
 const SHELL = ["/", "/index.html", "/style.css", "/config.js", "/charts.js", "/app.js", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
