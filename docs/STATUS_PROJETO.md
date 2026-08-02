@@ -32,6 +32,7 @@ partir das peças medidas e aplicação dos recursos em uma conta AWS real.
 | Pinout ESP-WROOM-32 30P | GPIOs usados compatíveis; segundo `VIN` mantido como ambiguidade crítica |
 | Templates AWS | JSON e componentes locais disponíveis; nenhum recurso de conta foi criado |
 | CI | workflow para Python, Node, Compose/Docker e os três builds PlatformIO |
+| Mobile Flutter | app Android/iOS/Web, análise estática, testes e build Web em modo demo |
 
 ## Funcionalidade entregue
 
@@ -47,6 +48,8 @@ partir das peças medidas e aplicação dos recursos em uma conta AWS real.
   especificação OpenAPI estão disponíveis.
 - Dashboard responsivo possui atualização em tempo real, estados textuais,
   proteção de DOM, reconexão e instalação PWA com shell offline.
+- Aplicativo Flutter possui conexão configurável, REST/WebSocket com reconexão,
+  histórico, alertas da sessão, diagnóstico do ESP32, temas e modo demonstração.
 - Configurador de firmware gera `secrets.h` sem imprimir senhas e suporta MQTT
   local ou certificados AWS IoT Core.
 - Firmware implementa QoS 1, ULID, `boot_id`, NTP obrigatório, reconexão não
@@ -65,8 +68,8 @@ partir das peças medidas e aplicação dos recursos em uma conta AWS real.
   deve ser confirmado por foto, continuidade ou documentação do fabricante.
 - A persistência local é apropriada a uma única instância e retenção curta.
   PostgreSQL/TimescaleDB continua recomendado para histórico longo, HA e frota.
-- A PWA cobre uso móvel básico. Push em segundo plano e app Flutter nativo são
-  evoluções opcionais, não pré-requisitos para usar o painel.
+- O app Flutter já cobre o uso em primeiro plano. Push em segundo plano, contas,
+  alertas persistentes e publicação nas lojas continuam como evolução.
 - CloudFormation e firmware AWS estão prontos para configuração, mas exigem
   conta, endpoint, certificados e custos autorizados pelo proprietário.
 - EasyEDA Pro e SolidWorks exigem medidas das peças reais e revisão humana antes

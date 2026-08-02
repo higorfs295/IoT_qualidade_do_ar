@@ -70,7 +70,7 @@ no firewall e use o IP do computador como `MQTT_HOST`.
 | Broker/PoC de carga | configuração e gerador disponíveis | benchmark reproduzido na máquina-alvo |
 | PCB | especificação, BOM, netlist e roteiro completos | esquemático/PCB no EasyEDA + revisão elétrica |
 | Case | roteiro paramétrico completo | medir montagem e modelar no SolidWorks |
-| Mobile | arquitetura e roadmap definidos | criar o projeto Flutter |
+| Mobile Flutter | implementado, testado e integrado à API/WS | piloto Android/iOS em aparelho físico |
 
 Detalhes e evidências: [`docs/STATUS_PROJETO.md`](docs/STATUS_PROJETO.md).
 
@@ -224,7 +224,7 @@ compose.yaml    stack local pronta com persistência e dados de demonstração
 scripts/        instaladores e configurador seguro do firmware
 hardware/pcb/   especificação elétrica/EasyEDA Pro
 hardware/case/  especificação mecânica/SolidWorks
-mobile/         arquitetura do futuro app Flutter
+mobile/         app Flutter Android/iOS/Web, testes e documentação
 docs/           contrato, status, testes, roadmaps e artefatos finais
 ```
 
@@ -233,6 +233,7 @@ docs/           contrato, status, testes, roadmaps e artefatos finais
 - [`docs/ROADMAP_GERAL.md`](docs/ROADMAP_GERAL.md) — sequência de execução e gates.
 - [`docs/ROADMAP_FIRMWARE.md`](docs/ROADMAP_FIRMWARE.md) — bring-up, calibração e release.
 - [`docs/ROADMAP_SOFTWARE.md`](docs/ROADMAP_SOFTWARE.md) — backend, web, mobile e nuvem.
+- [`mobile/docs/ROADMAP_MOBILE.md`](mobile/docs/ROADMAP_MOBILE.md) — piloto, AWS, operação remota e publicação.
 - [`docs/ROADMAP_HARDWARE_EASYEDA.md`](docs/ROADMAP_HARDWARE_EASYEDA.md) — esquemático e PCB no EasyEDA Pro.
 - [`docs/ROADMAP_CASE_SOLIDWORKS.md`](docs/ROADMAP_CASE_SOLIDWORKS.md) — case paramétrico no SolidWorks.
 - [`docs/PINOUT_ESP32_WROOM32_30P.md`](docs/PINOUT_ESP32_WROOM32_30P.md) — pinout e restrições GPIO.

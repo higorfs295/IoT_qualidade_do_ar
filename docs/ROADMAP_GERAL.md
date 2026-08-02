@@ -74,7 +74,8 @@ com múltiplos usuários:
 - [ ] Autenticação, autorização, TLS e gestão de dispositivos.
 - [ ] Alertas com histerese, auditoria e validação de falsos alarmes.
 - [ ] Observabilidade externa e soak de 7 dias.
-- [ ] Flutter somente se um requisito nativo não for coberto pela PWA.
+- [x] Cliente Flutter local com REST/WS, histórico, alertas e diagnóstico.
+- [ ] Validar Flutter em aparelhos Android/iOS e preparar publicação.
 
 Saída: release demonstrável por 7 dias sem intervenção manual.
 

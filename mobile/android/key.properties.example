@@ -1,0 +1,5 @@
+# Copie para key.properties e mantenha o arquivo real fora do Git.
+storePassword=ALTERE_E_NAO_VERSIONE
+keyPassword=ALTERE_E_NAO_VERSIONE
+keyAlias=upload
+storeFile=keystore/upload-keystore.jks

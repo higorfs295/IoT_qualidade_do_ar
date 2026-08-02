@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512" role="img" aria-label="Air Sense">
+  <rect width="512" height="512" fill="#12324a"/>
+  <circle cx="165" cy="180" r="66" fill="#77d2c5"/>
+  <circle cx="255" cy="145" r="88" fill="#77d2c5"/>
+  <circle cx="346" cy="190" r="68" fill="#77d2c5"/>
+  <rect x="110" y="180" width="290" height="105" rx="52" fill="#77d2c5"/>
+  <path d="M105 337h208c45 0 45-53 0-53h-35" fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round"/>
+  <path d="M155 402h242c43 0 43-52 0-52h-42" fill="none" stroke="#e47d00" stroke-width="28" stroke-linecap="round"/>
+</svg>

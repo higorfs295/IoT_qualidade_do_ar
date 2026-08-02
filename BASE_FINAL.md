@@ -231,7 +231,7 @@ produziria. A partir daí, aplicação e rede não distinguem sim de físico.
         │                persiste série temporal e expõe API REST + WebSocket
         │                     │
         │                     ├──► [Dashboard/PWA]  web responsiva e instalável
-        │                     └──► [App Flutter]    opcional, se houver requisito nativo
+        │                     └──► [App Flutter]    REST/WS, histórico e diagnóstico
         │
         └──► [Alertas]  regras de limiar → Telegram/e-mail (futuro)
 ```
@@ -245,8 +245,10 @@ produziria. A partir daí, aplicação e rede não distinguem sim de físico.
 - **Dashboard/PWA:** aplicação web responsiva, sem dependências em runtime,
   **legível e conduzível por um leigo**, com cartões, histórico curto, texto
   além de cor, atualização em tempo real e shell offline.
-- **Mobile:** a PWA é o cliente móvel funcional. Flutter permanece opcional para
-  push em segundo plano, BLE ou integrações nativas futuras.
+- **Mobile:** o cliente Flutter em [`mobile/`](mobile/) está implementado para
+  Android, iOS e Web, com REST/WebSocket, histórico, alertas locais, diagnóstico
+  do dispositivo, modo demonstração e preferências persistentes. Push em segundo
+  plano e contas continuam dependendo de backend autenticado.
 
 ---
 
@@ -284,8 +286,8 @@ A troca sim↔físico é só o `#define MODO_SENSOR` em `config.h`. O `main.cpp`
 - **Instalação** — [`compose.yaml`](compose.yaml) sobe Mosquitto, backend, painel
   e gerador de três estações; os scripts em [`scripts/`](scripts/) aguardam a
   stack ficar pronta antes de retornar sucesso.
-- **App nativo** — [`mobile/`](mobile/) documenta a opção Flutter, sem duplicar a
-  funcionalidade que a PWA já entrega.
+- **App nativo** — [`mobile/`](mobile/) entrega a experiência Flutter alinhada ao
+  visual web, reutilizando os mesmos endpoints e o contrato v1.1.
 
 Para histórico longo, usuários concorrentes e alta disponibilidade, o próximo
 gate é PostgreSQL/TimescaleDB e autenticação; o snapshot local não se apresenta
@@ -364,7 +366,7 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
 │   ├── backend/src/           MQTT, validação, REST/WS, snapshot e métricas
 │   └── web/public/            painel responsivo, manifest e service worker
 │
-├── mobile/                    roadmap opcional do app Flutter
+├── mobile/                    app Flutter funcional, testes e roadmaps próprios
 │
 ├── hardware/                  especificações e roteiros físicos
 │   ├── pcb/                    shield PCB (barramentos, conectores)
@@ -386,8 +388,8 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
 - **Fase 2 — Ingestão + Dashboard Web:** **pronta e validada** — persistência
   limitada, REST/WebSocket, health/Prometheus e PWA em
   [`dashboard/`](dashboard/README.md). Evolução: banco temporal, usuários e HA.
-- **Fase 3 — Produto + Alertas:** regras com histerese/auditoria; Flutter apenas
-  se a PWA não cobrir os requisitos móveis.
+- **Fase 3 — Produto + Alertas:** cliente Flutter local concluído; evoluir regras
+  persistentes com histerese/auditoria, contas e push autenticado.
 - **Fase 4 — Físico + Nuvem:** montar shield PCB e case; trocar `MODO_SENSOR`
   para físico; migrar o broker para AWS IoT Core (bridge).
 
@@ -412,6 +414,6 @@ Herda o já feito (TLS 8883, ACL por dispositivo, `setup_ubuntu_broker.sh --auth
   pinagem completa, netlist, BOM e a **estratégia de alimentação** (fonte ≥ 1 A,
   bulk no 5 V, e o **divisor de tensão** do MiCS-5524) para o EasyEDA Pro.
 
-`mobile/` documenta a evolução nativa opcional. `hardware/case/` e
+`mobile/` contém o cliente nativo implementado e seu roadmap de produção. `hardware/case/` e
 `hardware/pcb/` contêm especificações e roadmaps detalhados, mas os arquivos
 nativos dependem das medidas e da revisão nas ferramentas reais.

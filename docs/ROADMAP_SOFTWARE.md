@@ -72,17 +72,19 @@ documentado sem sugerir que dados antigos são atuais.
 
 ## Mobile
 
-A PWA é o cliente móvel suportado na base atual. Flutter só se justifica quando
-houver requisito nativo que a PWA não cubra.
+O cliente Flutter em [`../mobile/`](../mobile/) está implementado com poucas
+dependências, estado testável, REST, WebSocket com backoff, gráficos leves,
+histórico, alertas da sessão e diagnóstico do ESP-WROOM-32.
 
-1. Confirmar necessidade de push em segundo plano, BLE ou integração de SO.
-2. Criar `pubspec.yaml` e estrutura feature-first.
-3. Gerar modelos a partir de OpenAPI/JSON Schema.
-4. Usar Riverpod, Dio e `web_socket_channel` com backoff.
-5. Compartilhar fixtures e regras do backend; não copiar limiares.
-6. Executar testes unitários, widget e integração em Android/iOS.
+1. [x] Criar projeto Android/iOS/Web e identidade alinhada à web.
+2. [x] Integrar contrato v1.1, endpoints reais e modo demonstração explícito.
+3. [x] Limitar séries/alertas em memória e adicionar testes automatizados.
+4. [ ] Validar em aparelhos físicos, acessibilidade e sessão contínua de 24 h.
+5. [ ] Centralizar alertas persistentes no backend com autenticação e auditoria.
+6. [ ] Adicionar Cognito/OIDC e push FCM/APNs no marco AWS.
 
-Gate: paridade de contrato e estado com a web usando as mesmas fixtures.
+Gate atual: piloto em aparelhos físicos. Roadmap detalhado em
+[`../mobile/docs/ROADMAP_MOBILE.md`](../mobile/docs/ROADMAP_MOBILE.md).
 
 ## AWS
 
